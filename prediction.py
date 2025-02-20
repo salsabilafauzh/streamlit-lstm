@@ -21,9 +21,18 @@ companies = {
 #fetch and store to cache data
 @st.cache_data(ttl=1800)
 def fetch_data_yfinance(ticker_company, period_days, time_now):
-    start_date = time_now - timedelta(days=period_days)
-    data = yf.download(ticker_company, start=start_date, end=time_now, auto_adjust=False, interval='1d')
-    return data
+    try:
+        ticker = yf.Ticker(ticker_company)
+        start_date = time_now - timedelta(days=period_days)
+        yesterday = time_now - timedelta(days=1)
+        data = ticker.history(start=start_date, end=time_now, auto_adjust=False)
+        if data.empty:
+            data = ticker.history(start=start_date, end=yesterday, auto_adjust=False)
+        else:    
+            data = ticker.history(start=start_date, end=time_now, auto_adjust=False)
+        return data
+    except Exception as e:
+        print(f"Error: {e}")
 
 @st.cache_data(ttl=1800)
 def predict_all(tickers, time_now):
@@ -31,7 +40,7 @@ def predict_all(tickers, time_now):
 
     for ticker in tickers:
         # Fetch data with caching
-        data = fetch_data_yfinance(ticker, 30, time_now)
+        data = fetch_data_yfinance(ticker, 60, time_now)
         # Store the fetched data in session_state
         st.session_state['cached_data'][ticker] = data
 #predict by data
@@ -68,8 +77,6 @@ def main():
         if ticker in st.session_state['cached_data']:
             data = st.session_state['cached_data'][ticker]
             st.dataframe(data)
-
-
 
 
 
