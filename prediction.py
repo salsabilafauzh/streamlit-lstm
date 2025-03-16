@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objs as go 
 import plotly.express as px
 import os
+import toml
 
 from pages.session_config.history_training import load_training_history, save_training_history
 
@@ -19,7 +20,8 @@ from pages.session_config.history_training import load_training_history, save_tr
 st.set_page_config(
     page_title="Prediction - Telecommunication",
     page_icon="chart_with_upwards_trend",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 companies = {
     "TLKM.JK": "Telkom Indonesia (Persero) Tbk [TLKM]",
@@ -33,8 +35,6 @@ trends = {
 }
 
 features = ["Open","High","Low","Close","Adj Close","Volume"]
-
-
 
 
 #tampilan web
@@ -52,6 +52,13 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
             low=predicted_df["Low"], close=predicted_df["Close"],
             name="Predicted Data", increasing_line_color='rgba(255, 0, 0, 0.5)', decreasing_line_color='rgba(255, 0, 0, 0.5)'
         ))
+        fig.update_layout(
+                title=f"{ticker} Stock Price Prediction",
+                xaxis_title="Date",
+                yaxis_title="Stock Price",
+                legend_title="Legend",
+                dragmode="pan"
+            )
         st.plotly_chart(fig, use_container_width=True)
     else: 
         features = ["Close", "Open", "High", "Low", "Show All"]
@@ -72,6 +79,13 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
                     mode="lines", name=f"Predicted {feature}",
                     line=dict(color=colors[feature], dash="dot")
                 ))
+                fig.update_layout(
+                title=f"{ticker} Stock Price Prediction",
+                xaxis_title="Date",
+                yaxis_title="Stock Price",
+                legend_title="Legend",
+                dragmode="pan"
+            )
         else:
             fig.add_trace(go.Scatter(
                 x=existing_data.index, y=existing_data[selected_feature],
@@ -93,7 +107,8 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
                 title=f"{ticker} Stock Price Prediction",
                 xaxis_title="Date",
                 yaxis_title="Stock Price",
-                legend_title="Legend"
+                legend_title="Legend",
+                dragmode="pan"
             )
         st.plotly_chart(fig, use_container_width=True)
   
@@ -104,7 +119,7 @@ def plot_history_training(history):
     fig.add_trace(go.Scatter(y=history.get('val_loss'), mode='lines', name='Validation Loss'))
 
     fig.update_layout(
-        title="Training Loss vs Validation Loss latest training model!",
+        title="Training Loss vs Validation Loss latest training model",
         xaxis_title="Epochs",
         yaxis_title="Loss",
         legend=dict(x=0, y=1)
@@ -112,26 +127,82 @@ def plot_history_training(history):
     st.plotly_chart(fig, use_container_width=True)
  
 
+def highlight_first_rows(row):
+    if isinstance(row.name, pd.Timestamp): 
+        index_value = row.name.toordinal()  
+    else:
+        index_value = row.name  
+    num_days = trends.get(st.session_state["trend_type"], 7)
+
+    num_cols = len(row)  
+
+    if index_value < num_days:
+        return ["background-color: red"] * num_cols 
+    return [""] * num_cols  
+
+
+
 def view_setup(ticker):
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown('Select your configuration type:')
     with col2:
             st.radio(
-            "Change graph style👇",
+            "Change graph style:",
             ["candle", "time series"],
             key="plot_type",
             horizontal=True,
         )
             st.radio(
-            "Change trend to predict👇",
+            "Change trend to predict:",
             [ "WEEKLY","BI_WEEKLY","MONTHLY"],
             key="trend_type",
             horizontal=True,
         )
+    with col3:
+                
+        #preferences
+        language_options = {
+            "English": "en",
+            "Indonesian": "id",
+        }
+
+        CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
+
+
+        def update_config(lang):
+            config_data = {
+                "global": {
+                    "language": lang
+                },
+                "theme": {
+                    "primaryColor": "#ff4b4b",
+                    "backgroundColor": "#f4f4f4",
+                    "textColor": "#262730"
+                }
+            }
+            with open(CONFIG_PATH, "w") as config_file:
+                toml.dump(config_data, config_file)
+
+
+        if "selected_language" not in st.session_state:
+            st.session_state["selected_language"] = "en"
+
+        selected_lang = st.radio("Select Language", list(language_options.keys()), horizontal=True)
+        lang_code = language_options[selected_lang]
+
+        if lang_code != st.session_state["selected_language"]:
+            st.session_state["selected_language"] = lang_code
+            update_config(lang_code)  
+            st.rerun()
+
+        st.markdown(f"**Selected Language:** {selected_lang} (`{lang_code}`)")
+
   
+
     existing_data = st.session_state['cached_data'][ticker]
+
     last_date = existing_data.index[-1] 
     if st.session_state['trend_type'] == 'WEEKLY':
         predicted_data = st.session_state['weekly_prediction'][ticker]
@@ -147,13 +218,25 @@ def view_setup(ticker):
 
 
     data = pd.concat([existing_data, predicted_df])
-   
-  
-    plot_data(existing_data,predicted_df,ticker,st.session_state.plot_type)
-    st.dataframe(data,use_container_width=True)
+    desc_sorted_data = data.sort_index(ascending=False)
     
+    styled_sorted_df = desc_sorted_data.style.apply(highlight_first_rows, axis=1)
+
+    plot_data(existing_data,predicted_df,ticker,st.session_state.plot_type)
+    
+    existing_last = existing_data.iloc[-1]['Close']  
+    predicted_first = predicted_df.iloc[0]['Close']  
+    if existing_last > predicted_first:
+        st.info("Indikasi tren bergerak turun",icon='📉')
+    else:
+        st.info("Indikasi tren bergerak naik",icon='📈')
+
+    st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
     plot_history_training(history_training)
+
+    st.markdown("<div style='text-align: center; color: blue'> <b>copyright © salsabila fauziah </b></div>",unsafe_allow_html=True)
+
 
     st.session_state['isDisable_selector'] = False   
 
@@ -218,8 +301,8 @@ def recursive_prediction(steps, input_data, model,ticker,scaler):
         normal_prediction_result = scaler.inverse_transform(predicted_scaled)
         predictions.append(normal_prediction_result)
        
-        
-        result = np.array(predictions)
+
+        result = np.array(predictions).astype(int)
         if i == 6:
             st.session_state['weekly_prediction'][ticker] = result.reshape(7,6)
         elif i == 13:
@@ -278,7 +361,7 @@ def load_content():
         st.info(f"Next update in {int(time_left / 60)} minutes, last updated at {st.session_state['last_update_time']['time_yfinance_fetched']}")
 
 def main():
-    st.write("# Indonesia telecommunication company prediction!")
+    st.write("# Indonesia telecommunication company prediction.")
 
     selected_company = st.selectbox('Which company do you want to predict?', companies.values())
     selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
