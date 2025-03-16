@@ -1,9 +1,10 @@
 streamlit
 yfinance
-talib
+ta-lib
 pandas
 numpy
-plotly.graph_objs 
-plotly.express
-os
+scikit-learn
+tensorflow
+plotly
+python-dateutil
 toml
