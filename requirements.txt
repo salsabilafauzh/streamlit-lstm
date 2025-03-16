@@ -1,9 +1,9 @@
 streamlit
 yfinance
 pandas
-numpy
+numpy==1.23
 scikit-learn
-tensorflow
+tensorflow==2.14
 plotly
 python-dateutil
 toml
