@@ -1,6 +1,5 @@
 import streamlit as st
 import yfinance as yf
-import talib
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
