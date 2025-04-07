@@ -43,12 +43,10 @@ with col3:
 with col4:
     st.metric("Test Data", "20%")
 
-# Display diagram or image
 st.write("### Description of Long Short Term Memory Implementation")
 
-# Load and display diagram image
 img_lstm_cell = Image.open("./pages/images/lstm-cell.png")
 st.image(img_lstm_cell, caption="LSTM Cell Architecture")
 
-# Footer
+
 st.write("© 2024 All Rights Reserved.")

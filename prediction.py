@@ -14,7 +14,8 @@ import os
 import toml
 
 from pages.session_config.history_training import load_training_history, save_training_history
-
+from pages.session_config.lang import get_translation 
+import pages.session_config.lang as lang_module
 
 st.set_page_config(
     page_title="Prediction - Telecommunication",
@@ -32,9 +33,36 @@ trends = {
     "BI_WEEKLY" : 14,
     "MONTHTLY" : 30
 }
+language_options = {
+    "English": "en",
+    "Indonesian": "id",
+}
 
 features = ["Open","High","Low","Close","Adj Close","Volume"]
 
+
+# CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
+# def update_config(lang):
+#             config_data = {
+#                 "global": {
+#                     "language": lang
+#                 },
+#                 "theme": {
+#                     "primaryColor": "#ff4b4b",
+#                     "backgroundColor": "#f4f4f4",
+#                     "textColor": "#262730"
+#                 }
+#             }
+#             with open(CONFIG_PATH, "w") as config_file:
+#                 toml.dump(config_data, config_file)
+
+def reload_language_config():
+    lang_code = st.session_state["selected_language"]
+    lang_module.load_translations(lang_code)
+
+#handling view
+def handling_view():
+    st.text("Something went wrong. try again later.")
 
 #tampilan web
 def plot_data(existing_data,predicted_df,ticker, plot_type):
@@ -118,7 +146,7 @@ def plot_history_training(history):
     fig.add_trace(go.Scatter(y=history.get('val_loss'), mode='lines', name='Validation Loss'))
 
     fig.update_layout(
-        title="Training Loss vs Validation Loss latest training model",
+        title=get_translation(st.session_state['selected_language'], "train_loss_title"),
         xaxis_title="Epochs",
         yaxis_title="Loss",
         legend=dict(x=0, y=1)
@@ -145,60 +173,33 @@ def view_setup(ticker):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown('Select your configuration type:')
+        st.markdown(get_translation(st.session_state['selected_language'], "configuration_title"))
     with col2:
             st.radio(
-            "Change graph style:",
+            get_translation(st.session_state['selected_language'], "change_graph"),
             ["candle", "time series"],
             key="plot_type",
             horizontal=True,
         )
             st.radio(
-            "Change trend to predict:",
+            get_translation(st.session_state['selected_language'], "change_trend"),
             [ "WEEKLY","BI_WEEKLY","MONTHLY"],
             key="trend_type",
             horizontal=True,
         )
     with col3:
-                
-        #preferences
-        language_options = {
-            "English": "en",
-            "Indonesian": "id",
-        }
-
-        CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
-
-
-        def update_config(lang):
-            config_data = {
-                "global": {
-                    "language": lang
-                },
-                "theme": {
-                    "primaryColor": "#ff4b4b",
-                    "backgroundColor": "#f4f4f4",
-                    "textColor": "#262730"
-                }
-            }
-            with open(CONFIG_PATH, "w") as config_file:
-                toml.dump(config_data, config_file)
-
-
-        if "selected_language" not in st.session_state:
-            st.session_state["selected_language"] = "en"
-
-        selected_lang = st.radio("Select Language", list(language_options.keys()), horizontal=True)
+        selected_lang = st.radio( get_translation(st.session_state['selected_language'], "select_language"), list(language_options.keys()), horizontal=True)
         lang_code = language_options[selected_lang]
 
+        
         if lang_code != st.session_state["selected_language"]:
             st.session_state["selected_language"] = lang_code
-            update_config(lang_code)  
-            st.rerun()
+            st.session_state['cached_data'] = {}  
+            st.session_state['last_update_time']['time_yfinance_fetched'] = datetime.now() - timedelta(minutes=30) 
+            reload_language_config() 
+            
+        st.markdown(f"**{get_translation(st.session_state['selected_language'], 'selected_language')}**: {selected_lang} (`{lang_code}`)")
 
-        st.markdown(f"**Selected Language:** {selected_lang} (`{lang_code}`)")
-
-  
 
     existing_data = st.session_state['cached_data'][ticker]
 
@@ -226,17 +227,15 @@ def view_setup(ticker):
     existing_last = existing_data.iloc[-1]['Close']  
     predicted_first = predicted_df.iloc[0]['Close']  
     if existing_last > predicted_first:
-        st.info("Indikasi tren bergerak turun",icon='📉')
+        st.info(get_translation(st.session_state['selected_language'], "trend_info_down"),icon='📉')
     else:
-        st.info("Indikasi tren bergerak naik",icon='📈')
+        st.info(get_translation(st.session_state['selected_language'], "trend_info_up"),icon='📈')
 
     st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
     plot_history_training(history_training)
 
-    st.markdown("<div style='text-align: center; color: blue'> <b>copyright © salsabila fauziah </b></div>",unsafe_allow_html=True)
-
-
+    st.markdown(f"<div style='text-align: center; color: blue'> <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b></div>", unsafe_allow_html=True)
     st.session_state['isDisable_selector'] = False   
 
 
@@ -360,17 +359,20 @@ def load_content():
         st.info(f"Next update in {int(time_left / 60)} minutes, last updated at {st.session_state['last_update_time']['time_yfinance_fetched']}")
 
 def main():
-    st.write("# Indonesia telecommunication company prediction.")
+    # try:
+        st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
 
-    selected_company = st.selectbox('Which company do you want to predict?', companies.values())
-    selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
+        selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
+        selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
 
-    load_content()
+        load_content()
 
-    if selected_ticker not in st.session_state.get('predicted_data', {}):
-        predict(selected_ticker, st.session_state['cached_data'][selected_ticker].values, datetime.now())
+        if selected_ticker not in st.session_state.get('predicted_data', {}):
+            predict(selected_ticker, st.session_state['cached_data'][selected_ticker].values, datetime.now())
 
-    view_setup(selected_ticker)
+        view_setup(selected_ticker)
+    # except:
+    #     handling_view()
 
 
  #konfigurasi session
@@ -403,6 +405,9 @@ if 'trend_type' not in st.session_state:
 
 if 'isDisable_selector' not in st.session_state:
     st.session_state.isDisable_selector = True
+
+if "selected_language" not in st.session_state:
+    st.session_state["selected_language"] = "en"
 
 
 if __name__ == "__main__":
