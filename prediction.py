@@ -36,6 +36,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+st.markdown(
+    r"""
+    <style>
+    .stAppDeployButton {
+            visibility: hidden;
+        }
+    </style>
+    """, unsafe_allow_html=True
+)
+
 companies = {
     "TLKM.JK": "Telkom Indonesia (Persero) Tbk [TLKM]",
     "ISAT.JK": "Indosat Tbk [ISAT]",

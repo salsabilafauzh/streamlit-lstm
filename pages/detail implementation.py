@@ -7,6 +7,29 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown("""
+    <style>
+        .reportview-container {
+            margin-top: -2em;
+        }
+        #MainMenu {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
+""", unsafe_allow_html=True)
+
+
+st.markdown(
+    r"""
+    <style>
+    .stAppDeployButton {
+            visibility: hidden;
+        }
+    </style>
+    """, unsafe_allow_html=True
+)
+
 img_python_logo = Image.open('./pages/images/python-logo.png')
 img_yahoo_finance = Image.open('./pages/images/yahoo-finance_BIG.png')
 
