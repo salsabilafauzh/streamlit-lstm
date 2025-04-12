@@ -23,6 +23,19 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+st.markdown("""
+    <style>
+        .reportview-container {
+            margin-top: -2em;
+        }
+        #MainMenu {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
+""", unsafe_allow_html=True)
+
 companies = {
     "TLKM.JK": "Telkom Indonesia (Persero) Tbk [TLKM]",
     "ISAT.JK": "Indosat Tbk [ISAT]",
@@ -41,20 +54,20 @@ language_options = {
 features = ["Open","High","Low","Close","Adj Close","Volume"]
 
 
-# CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
-# def update_config(lang):
-#             config_data = {
-#                 "global": {
-#                     "language": lang
-#                 },
-#                 "theme": {
-#                     "primaryColor": "#ff4b4b",
-#                     "backgroundColor": "#f4f4f4",
-#                     "textColor": "#262730"
-#                 }
-#             }
-#             with open(CONFIG_PATH, "w") as config_file:
-#                 toml.dump(config_data, config_file)
+CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
+def update_config(lang):
+            config_data = {
+                "global": {
+                    "language": lang
+                },
+                "theme": {
+                    "primaryColor": "#ff4b4b",
+                    "backgroundColor": "#f4f4f4",
+                    "textColor": "#262730"
+                }
+            }
+            with open(CONFIG_PATH, "w") as config_file:
+                toml.dump(config_data, config_file)
 
 def reload_language_config():
     lang_code = st.session_state["selected_language"]
