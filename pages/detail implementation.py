@@ -1,5 +1,6 @@
 import streamlit as st
 from PIL import Image
+from pages.session_config.lang_detail import get_translation 
 
 st.set_page_config(
     page_title="Detail",
@@ -29,47 +30,181 @@ st.markdown(
     </style>
     """, unsafe_allow_html=True
 )
+st.markdown("""<style> .reportview-container { margin-top: -2em; } #MainMenu {visibility: hidden;} .stDeployButton {display:none;} footer {visibility: hidden;} #stDecoration {display:none;} </style>""", unsafe_allow_html=True)
 
+
+if 'selected_language' not in st.session_state:
+    st.session_state['selected_language'] = 'id'  
+st.title(get_translation(st.session_state['selected_language'], 'page_title'))
+
+# Tentang Halaman
+st.markdown(f"""<div style="background-color: #e6f0fa; padding: 15px; border-left: 6px solid #2c6faf; border-radius: 8px; font-size: 16px;">
+    <strong>{get_translation(st.session_state['selected_language'], 'about_this_page_label')}</strong><br>
+    {get_translation(st.session_state['selected_language'], 'about_this_page')}</div>""", unsafe_allow_html=True)
+
+# Teknologi yang digunakan
+st.markdown(f"""<div style="text-align: center; padding-top: 10px;">
+    <h4 style="margin-bottom: 20px;">🛠️ {get_translation(st.session_state['selected_language'], 'tech_stack')}</h4>
+</div>""", unsafe_allow_html=True)
+
+# Gambar Python dan Yahoo Finance
 img_python_logo = Image.open('./pages/images/python-logo.png')
 img_yahoo_finance = Image.open('./pages/images/yahoo-finance_BIG.png')
 
-# Page title
-st.title("Detail Of Implementation")
-st.subheader("Prediction of Telecommunications Sector Stocks in Indonesia")
-
-# Logo section with Python and Yahoo finance logos
-col1, col2, col3 = st.columns([2, 0.6, 0.6])
+col1, col2 = st.columns([1, 1])
 with col1:
-    st.write("### The time range of data used")
-    st.write("August 2019 - August 2024")    
+   st.image(img_python_logo, width="auto", caption="Python", use_column_width="auto")
 with col2:
-    st.image(img_python_logo, width=150) 
-with col3:
-    st.image(img_yahoo_finance, width=150) 
+    st.image(img_yahoo_finance, width="auto", caption="Yahoo Finance", use_column_width="auto")
 
-# List of companies
-st.write("## Indeks LQ45")
+st.markdown(f"""<div style="padding: 10px 0;">
+    <h4 style='margin-bottom: 5px;'>{get_translation(st.session_state['selected_language'], 'time_range')}</h4>
+    <p style='margin-top: 0;'><strong>{get_translation(st.session_state['selected_language'], 'time_used')}</strong></p>
+</div>""", unsafe_allow_html=True)
+
+st.markdown(f"""<div style="background-color: #e6f0fa; padding: 15px; border-left: 6px solid #2c6faf; border-radius: 8px; font-size: 16px;">
+    <strong>{get_translation(st.session_state['selected_language'], 'data_used')}</strong><br>
+    {get_translation(st.session_state['selected_language'], 'data_used_description')}</div>
+""", unsafe_allow_html=True)
+
+
 companies = {
     "TLKM": "PT Telkom Indonesia (Persero) Tbk",
     "ISAT": "Indosat Tbk PT",
     "EXCL": "XL Axiata Tbk PT"
 }
 
+company_info = f"""
+<div style="background-color: #f0f8ff; padding: 20px; border-radius: 10px; margin-top: 20px;">
+    <h4 style="margin-bottom: 5px;">{get_translation(st.session_state['selected_language'], 'companies_label')}</h4>
+    <ul style="padding-left: 20px;">
+"""
+
 for ticker, name in companies.items():
-    st.write(f" **{ticker}** - {name}")
+    company_info += f"<li><strong>{ticker}</strong> - {name}</li>"
 
-# Train/Test split
-st.write("#### Train/Test Split")
-col3, col4 = st.columns([1, 1])
-with col3:
-    st.metric("Train Data", "80%")
-with col4:
-    st.metric("Test Data", "20%")
+company_info += f"""</ul>
+    <p style="margin-top: 15px;">
+       {get_translation(st.session_state['selected_language'], 'companies_available_description')}
+    </p>
 
-st.write("### Description of Long Short Term Memory Implementation")
+</div>"""
 
-img_lstm_cell = Image.open("./pages/images/lstm-cell.png")
-st.image(img_lstm_cell, caption="LSTM Cell Architecture")
+st.markdown(company_info, unsafe_allow_html=True)
 
 
-st.write("© 2024 All Rights Reserved.")
+st.markdown(f"""
+<div style="background-color: #f9f9f9; padding: 20px 30px; border-radius: 12px; margin-top: 20px; margin-bottom:20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);">
+    <h4 style='text-align: center; color: #333333;'>🔍 Train/Test Split</h4>
+    <p style='text-align: justify; font-size: 15px; color: #444444; margin-top: 10px;'>
+        {get_translation(st.session_state['selected_language'], 'train_test_split_description')}
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown(f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_train_label')}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; font-size: 28px; color: green;'>80%</div>", unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_test_label')}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; font-size: 28px; color: orange;'>20%</div>", unsafe_allow_html=True)
+
+st.write(f"### {get_translation(st.session_state['selected_language'], 'lstm_detail_label')}")
+
+
+img_lstm_cell = Image.open("./pages/images/lstm-flow.jpg")
+st.image(img_lstm_cell, caption="LSTM Flow Architecture", use_column_width="always")
+
+st.markdown(f"""
+<div style="
+    background-color: #e6f0fa;
+    padding: 15px;
+    border-left: 6px solid #2c6faf;
+    border-radius: 8px;
+    font-size: 16px;
+">
+    <strong>{get_translation(st.session_state['selected_language'], 'how_lstm_works_label')}</strong><br>
+    {get_translation(st.session_state['selected_language'], 'lstm_description')}
+</div>
+""", unsafe_allow_html=True)
+
+img_lstm_cell = Image.open("./pages/images/lstm-cell.jpg")
+st.image(img_lstm_cell, caption="LSTM Cell Architecture",use_column_width="always")
+
+st.markdown(f"""
+<div style="
+    background-color: #e6f0fa;
+    padding: 15px;
+    border-left: 6px solid #2c6faf;
+    border-radius: 8px;
+    font-size: 16px;
+">
+    <strong>{get_translation(st.session_state['selected_language'], 'inside_of_lstm_label')}</strong><br>
+   {get_translation(st.session_state['selected_language'], 'inside_cell_lstm_description')}
+</div>
+""", unsafe_allow_html=True)
+
+
+st.markdown(f"""
+---
+
+### 🔍 {get_translation(st.session_state['selected_language'], 'loss_curve_label')}
+{get_translation(st.session_state['selected_language'], 'loss_curve_description')}
+> *"{get_translation(st.session_state['selected_language'], 'loss_curve_highlight')}"*
+""")
+
+st.image("./pages/images/loss-plot.png", caption="Loss result", use_column_width=True)
+
+
+st.markdown(f"""
+### 📈 {get_translation(st.session_state['selected_language'], 'model_eval_label')}
+
+{get_translation(st.session_state['selected_language'], 'model_eval_description')}
+
+---
+
+#### 🔹 1. Root Mean Squared Error (RMSE)
+
+{get_translation(st.session_state['selected_language'], 'rmse_description')}
+
+{get_translation(st.session_state['selected_language'], 'rmse_description_2')}
+""")
+
+# Display local RMSE formula image
+st.image("./pages/images/rmse.png", caption="RMSE Formula", use_column_width=False)
+
+st.markdown(f"""
+---
+
+#### 🔹 2. Mean Absolute Percentage Error (MAPE)
+            
+{get_translation(st.session_state['selected_language'], 'mape_description')}
+
+{get_translation(st.session_state['selected_language'], 'mape_description_2')}
+""")
+
+# Display local MAPE formula image
+st.image("./pages/images/mape.png", caption="MAPE Formula", use_column_width=False)
+
+
+# Footer
+st.markdown(f"""
+    <style>
+    .footer {{
+        bottom: 0;
+        width: 100%;
+        background-color: #f0f2f6;
+        color: #666;
+        text-align: center;
+        padding: 10px;
+        font-size: 14px;
+        border-top: 1px solid #ccc;
+    }}
+    </style>
+    <div class="footer">
+        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
+    </div>
+""", unsafe_allow_html=True)

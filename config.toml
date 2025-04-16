@@ -5,3 +5,20 @@ backgroundColor="#FFFFFF"
 secondaryBackgroundColor="#F0F2F6"
 textColor="#31333F"
 font="sans serif"
+primaryColor = "#F63366"
+
+[client]
+toolbarMode = "viewer"
+
+
+[browser]
+serverAddress = "streamlit-lstm"
+gatherUsageStats = true
+serverPort = 8501
+
+
+[server]
+address = "127.0.0.1"
+port = 8501
+enableCORS = false
+headless = true

@@ -5,17 +5,16 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM,Dense, Dropout # type: ignore
 from tensorflow.keras.models import Sequential,load_model # type: ignore
-from tensorflow.keras.metrics import RootMeanSquaredError, MeanAbsolutePercentageError # type: ignore
 from dateutil.relativedelta import relativedelta
 from datetime import datetime, timedelta
-import plotly.graph_objs as go 
-import plotly.express as px
+import plotly.graph_objs as go
 import os
-import toml
+import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler
+import time
 
 from pages.session_config.history_training import load_training_history, save_training_history
 from pages.session_config.lang import get_translation 
-import pages.session_config.lang as lang_module
 
 st.set_page_config(
     page_title="Prediction - Telecommunication",
@@ -58,53 +57,33 @@ trends = {
     "MONTHTLY" : 30
 }
 language_options = {
-    "English": "en",
-    "Indonesian": "id",
+    "English": "en-US",
+    "Indonesia": "id",
 }
 
 features = ["Open","High","Low","Close","Adj Close","Volume"]
 
-
-CONFIG_PATH = os.path.expanduser("~/.streamlit/config.toml")
-def update_config(lang):
-            config_data = {
-                "global": {
-                    "language": lang
-                },
-                "theme": {
-                    "primaryColor": "#ff4b4b",
-                    "backgroundColor": "#f4f4f4",
-                    "textColor": "#262730"
-                }
-            }
-            with open(CONFIG_PATH, "w") as config_file:
-                toml.dump(config_data, config_file)
-
-def reload_language_config():
-    lang_code = st.session_state["selected_language"]
-    lang_module.load_translations(lang_code)
-
 #handling view
 def handling_view():
-    st.text("Something went wrong. try again later.")
+    st.text(f"{get_translation(st.session_state['selected_language'], 'something_wrong')}")
 
 #tampilan web
 def plot_data(existing_data,predicted_df,ticker, plot_type):
-    st.subheader("Prediction Results")
+    st.subheader(f"{get_translation(st.session_state['selected_language'], 'title_prediction_result')}")
     if plot_type == 'candle':
         fig = go.Figure()
         fig.add_trace(go.Candlestick(
             x=existing_data.index, open=existing_data["Open"], high=existing_data["High"],
-            low=existing_data["Low"], close=existing_data["Close"], name="Existing Data"
+            low=existing_data["Low"], close=existing_data["Close"], name=f"{get_translation(st.session_state['selected_language'], 'existing_data')}",
         ))
         
         fig.add_trace(go.Candlestick(
             x=predicted_df.index, open=predicted_df["Open"], high=predicted_df["High"],
             low=predicted_df["Low"], close=predicted_df["Close"],
-            name="Predicted Data", increasing_line_color='rgba(255, 0, 0, 0.5)', decreasing_line_color='rgba(255, 0, 0, 0.5)'
+            name=f"{get_translation(st.session_state['selected_language'], 'data_prediction')}", increasing_line_color='rgba(30, 144, 255, 0.5)', decreasing_line_color='rgba(138, 43, 226, 0.5)'
         ))
         fig.update_layout(
-                title=f"{ticker} Stock Price Prediction",
+                title=f"{ticker}",
                 xaxis_title="Date",
                 yaxis_title="Stock Price",
                 legend_title="Legend",
@@ -114,7 +93,7 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
     else: 
         features = ["Close", "Open", "High", "Low", "Show All"]
         colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
-        selected_feature = st.radio("Select Feature to Show:", features, index=0)
+        selected_feature = st.radio(f"{get_translation(st.session_state['selected_language'], 'select_feature')}", features, index=0)
 
         fig = go.Figure()
 
@@ -131,7 +110,7 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
                     line=dict(color=colors[feature], dash="dot")
                 ))
                 fig.update_layout(
-                title=f"{ticker} Stock Price Prediction",
+                title=f"{ticker}",
                 xaxis_title="Date",
                 yaxis_title="Stock Price",
                 legend_title="Legend",
@@ -155,19 +134,19 @@ def plot_data(existing_data,predicted_df,ticker, plot_type):
             )
 
             fig.update_layout(
-                title=f"{ticker} Stock Price Prediction",
+                title=f"{ticker}",
                 xaxis_title="Date",
                 yaxis_title="Stock Price",
                 legend_title="Legend",
                 dragmode="pan"
             )
         st.plotly_chart(fig, use_container_width=True)
-  
 
 def plot_history_training(history):
+    st.subheader(f"{get_translation(st.session_state['selected_language'], 'training_time_info')}: {history['training_time']} {get_translation(st.session_state['selected_language'], 'second')}")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=history.get('loss'), mode='lines', name='Train Loss'))
-    fig.add_trace(go.Scatter(y=history.get('val_loss'), mode='lines', name='Validation Loss'))
+    fig.add_trace(go.Scatter(y=history['loss'], mode='lines', name='Train Loss'))
+    fig.add_trace(go.Scatter(y=history['val_loss'], mode='lines', name='Validation Loss'))
 
     fig.update_layout(
         title=get_translation(st.session_state['selected_language'], "train_loss_title"),
@@ -176,9 +155,8 @@ def plot_history_training(history):
         legend=dict(x=0, y=1)
     )
     st.plotly_chart(fig, use_container_width=True)
- 
 
-def highlight_first_rows(row):
+def highlight_predicted_data(row):
     if isinstance(row.name, pd.Timestamp): 
         index_value = row.name.toordinal()  
     else:
@@ -191,6 +169,32 @@ def highlight_first_rows(row):
         return ["background-color: red"] * num_cols 
     return [""] * num_cols  
 
+def change_language():
+    lang_code = language_options[st.session_state["language_selector"]]
+    st.session_state["selected_language"] = lang_code
+    st.session_state["language_selector"] = next((k for k, v in language_options.items() if v == lang_code), None)
+
+def lock_ui():
+    st.markdown("""
+    <style>
+    body, .block-container, .sidebar, .stButton > button {
+        pointer-events: none !important;
+        opacity: 0.5 !important;
+        cursor: wait !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def unlock_ui():
+    st.markdown("""
+    <style>
+    body, .block-container, .sidebar, .stButton > button {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        cursor: default !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def view_setup(ticker):
@@ -212,21 +216,12 @@ def view_setup(ticker):
             horizontal=True,
         )
     with col3:
-        selected_lang = st.radio( get_translation(st.session_state['selected_language'], "select_language"), list(language_options.keys()), horizontal=True)
-        lang_code = language_options[selected_lang]
-
-        
-        if lang_code != st.session_state["selected_language"]:
-            st.session_state["selected_language"] = lang_code
-            st.session_state['cached_data'] = {}  
-            st.session_state['last_update_time']['time_yfinance_fetched'] = datetime.now() - timedelta(minutes=30) 
-            reload_language_config() 
-            
-        st.markdown(f"**{get_translation(st.session_state['selected_language'], 'selected_language')}**: {selected_lang} (`{lang_code}`)")
-
-
+        selected_lang = st.radio(get_translation(st.session_state['selected_language'], "select_language"), list(language_options.keys()),  key="language_selector",
+        horizontal=True,
+        on_change=change_language)
+        st.markdown(f"**{get_translation(st.session_state['selected_language'], 'selected_language')}**: {selected_lang} (`{selected_lang}`)")
+   
     existing_data = st.session_state['cached_data'][ticker]
-
     last_date = existing_data.index[-1] 
     if st.session_state['trend_type'] == 'WEEKLY':
         predicted_data = st.session_state['weekly_prediction'][ticker]
@@ -244,23 +239,62 @@ def view_setup(ticker):
     data = pd.concat([existing_data, predicted_df])
     desc_sorted_data = data.sort_index(ascending=False)
     
-    styled_sorted_df = desc_sorted_data.style.apply(highlight_first_rows, axis=1)
+    styled_sorted_df = desc_sorted_data.style.apply(highlight_predicted_data, axis=1)
 
     plot_data(existing_data,predicted_df,ticker,st.session_state.plot_type)
     
-    existing_last = existing_data.iloc[-1]['Close']  
-    predicted_first = predicted_df.iloc[0]['Close']  
-    if existing_last > predicted_first:
-        st.info(get_translation(st.session_state['selected_language'], "trend_info_down"),icon='📉')
+    existing_avg = existing_data['Close'].tail(1).values[0]
+    predicted_avg = predicted_df['Close'].mean() 
+
+    if existing_avg > predicted_avg:
+        trend_info = get_translation(st.session_state['selected_language'], "trend_info_down")
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: center; align-items: center; height: auto; background-color: #E74C3C; border-radius: 5px; padding: 10px; margin-bottom: 20px;">
+                <h3 style=""> {trend_info}</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     else:
-        st.info(get_translation(st.session_state['selected_language'], "trend_info_up"),icon='📈')
+        trend_info = get_translation(st.session_state['selected_language'], "trend_info_up")
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: center; align-items: center; height: auto; background-color: #2ECC71; border-radius: 5px; padding: 10px; margin-bottom: 20px;">
+                <h3 style=""> {trend_info}</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
+    )
+
 
     st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
-    plot_history_training(history_training)
+    if history_training is None:
+        st.warning(get_translation(st.session_state['selected_language'], "no_training_history"))
+    else:
+        plot_history_training(history_training)
 
-    st.markdown(f"<div style='text-align: center; color: blue'> <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b></div>", unsafe_allow_html=True)
-    st.session_state['isDisable_selector'] = False   
+    st.markdown(
+    f"""
+    <style>
+    .footer {{
+        bottom: 0;
+        width: 100%;
+        background-color: #f0f2f6;
+        color: #666;
+        text-align: center;
+        padding: 10px;
+        font-size: 14px;
+        border-top: 1px solid #ccc;
+    }}
+    </style>
+    <div class="footer">
+        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
 #PRE-PROCESSING
@@ -291,39 +325,44 @@ def reshape_data(data, time_step):
 #TRAINING & LOAD PREDICTION
 @st.cache_resource
 def retraining_model(X_train, y_train,ticker):
+    lock_ui()
     model = Sequential()
     model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+    model.add(Dropout(0.3))
+    model.add(LSTM(units = 32))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=50, return_sequences=True))
-    model.add(Dropout(0.2))
-    model.add(LSTM(units = 32, return_sequences = False))
-    model.add(Dense(len(features)))
+    model.add(Dense(6))
     model.compile(optimizer = "adam",loss = "mean_absolute_error", metrics=[
-        RootMeanSquaredError(name='rmse'),
-        MeanAbsolutePercentageError(name='mape')])
-   
-    history = model.fit(X_train, y_train, epochs=300, batch_size=32, validation_split=0.2,verbose=1)
-    save_training_history(history.history['loss'], history.history['val_loss'],ticker)
-    plot_history_training(history)
+        tf.keras.metrics.RootMeanSquaredError(name='rmse'),
+        tf.keras.metrics.MeanAbsolutePercentageError(name='mape')])
 
+    y_train = y_train[:, :6]
+
+    start_time = time.time()
+
+    history = model.fit(X_train, y_train, epochs=400, batch_size=32, verbose=1, validation_split=0.2)
+    end_time = time.time()
+    training_time = end_time - start_time
+
+    save_training_history(history.history['loss'], history.history['val_loss'],training_time,ticker)
+    unlock_ui()
     return model
 
 
 def recursive_prediction(steps, input_data, model,ticker,scaler):
     predictions = []
     input_data = input_data
-    input_sequence = input_data[-steps:].reshape(1,5,6)
+    input_sequence = input_data[-steps:].reshape(1,steps,6)
     
     for i in range(30):
         predicted_scaled = model.predict(input_sequence)
-
+        
         new_input = np.append(input_sequence[:, 1:, :], predicted_scaled.reshape(1,1,6), axis=1)
         input_sequence = new_input 
 
         normal_prediction_result = scaler.inverse_transform(predicted_scaled)
         predictions.append(normal_prediction_result)
        
-
         result = np.array(predictions).astype(int)
         if i == 6:
             st.session_state['weekly_prediction'][ticker] = result.reshape(7,6)
@@ -336,7 +375,7 @@ def recursive_prediction(steps, input_data, model,ticker,scaler):
 
 @st.cache_resource  
 def load_model_lstm(ticker):
-    file_name = companies.get(ticker)
+    file_name = companies[ticker]
     if ticker == "TLKM.JK":
         model=load_model(f"./pages/saved_model/{file_name}.h5",compile=False)
     elif ticker == "EXCL.JK":
@@ -352,7 +391,23 @@ def predict(ticker, data, current_time):
     scaled_data = scaler.fit_transform(data)
     windowed_data_x,windowed_data_y = reshape_data(scaled_data,5)
     if current_time >= st.session_state['last_update_time']['next_date_update']:
+        update_model(windowed_data_x,windowed_data_y,current_time)
+        model_lstm = load_model_lstm(ticker)
+    else:
+        model_lstm = load_model_lstm(ticker)
+        model_lstm.summary()
+    recursive_prediction(5,scaled_data,model_lstm,ticker,scaler)
+
+
+def update_model(windowed_data_x,windowed_data_y,current_time):
+
+    for _, (ticker, _) in enumerate(companies.items()):
+        if ticker not in st.session_state['cached_data']:
+            data = fetch_data_yfinance(ticker, datetime.now())
+            df_selected_data = data[features]
+            st.session_state['cached_data'][ticker] = df_selected_data
         model_lstm = retraining_model(windowed_data_x,windowed_data_y,ticker)
+
         model_lstm.summary()
 
         model_dir = "./pages/saved_model"
@@ -362,41 +417,33 @@ def predict(ticker, data, current_time):
 
         st.session_state['last_update_time']['date_fetched'] = current_time
         st.session_state['last_update_time']['next_date_update'] = current_time + relativedelta(months=1)
-    else:
-        model_lstm = load_model_lstm(ticker)
-        model_lstm.summary()
-    recursive_prediction(5,scaled_data,model_lstm,ticker,scaler)
-
 
 def load_content():
     current_time = datetime.now()
-    if (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds() >= 1800:
+    if (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds() >= 1800 and st.session_state['predict_result']== {}:
         tickers = companies.keys()
         for ticker in tickers:
             data = fetch_data_yfinance(ticker, current_time)
             df_selected_data = data[features]
             st.session_state['cached_data'][ticker] = df_selected_data
-
-        st.session_state['last_update_time']['time_yfinance_fetched'] = current_time
+            st.session_state['last_update_time']['time_yfinance_fetched'] = current_time
+            predict(ticker, st.session_state['cached_data'][ticker], datetime.now())
     else:
-        time_left = 1800 - (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds()
-        st.info(f"Next update in {int(time_left / 60)} minutes, last updated at {st.session_state['last_update_time']['time_yfinance_fetched']}")
-
+        # time_left = 1800 - (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds()
+        translated_text = get_translation(st.session_state['selected_language'], "last_update_at")
+        st.info(f"{translated_text} {st.session_state['last_update_time']['time_yfinance_fetched']}")
+    
 def main():
-    # try:
+    try:
         st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
-
         selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
         selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
 
         load_content()
-
-        if selected_ticker not in st.session_state.get('predicted_data', {}):
-            predict(selected_ticker, st.session_state['cached_data'][selected_ticker].values, datetime.now())
-
         view_setup(selected_ticker)
-    # except:
-    #     handling_view()
+    except:
+        handling_view()
+
 
 
  #konfigurasi session
@@ -427,11 +474,12 @@ if 'plot_type' not in st.session_state:
 if 'trend_type' not in st.session_state:
     st.session_state.trend_type = "WEEKLY"
 
-if 'isDisable_selector' not in st.session_state:
-    st.session_state.isDisable_selector = True
 
 if "selected_language" not in st.session_state:
-    st.session_state["selected_language"] = "en"
+    st.session_state["selected_language"] = "id"
+
+if "language_selector" not in st.session_state:
+    st.session_state["language_selector"] = "Indonesia"
 
 
 if __name__ == "__main__":
