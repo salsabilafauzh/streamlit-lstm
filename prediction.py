@@ -61,7 +61,7 @@ language_options = {
     "Indonesia": "id",
 }
 
-features = ["Open","High","Low","Close","Adj Close","Volume"]
+features = ["Open","High","Low","Close"]
 
 #handling view
 def handling_view():
@@ -326,21 +326,36 @@ def reshape_data(data, time_step):
 @st.cache_resource
 def retraining_model(X_train, y_train,ticker):
     lock_ui()
-    model = Sequential()
-    model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-    model.add(Dropout(0.3))
-    model.add(LSTM(units = 32))
-    model.add(Dropout(0.2))
-    model.add(Dense(6))
-    model.compile(optimizer = "adam",loss = "mean_absolute_error", metrics=[
-        tf.keras.metrics.RootMeanSquaredError(name='rmse'),
-        tf.keras.metrics.MeanAbsolutePercentageError(name='mape')])
+    if ticker == "TLKM.JK" or "EXCL.JK":
+        model = Sequential()
+        model.add(LSTM(units=64, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+        model.add(Dropout(0.2))
+        model.add(LSTM(units = 64))
+        model.add(Dropout(0.2))
+        model.add(Dense(4))
+        model.compile(optimizer = "adam",loss = "mean_absolute_error", metrics=[
+            tf.keras.metrics.RootMeanSquaredError(name='rmse'),
+            tf.keras.metrics.MeanAbsolutePercentageError(name='mape')])
+    elif ticker == "ISAT.JK":
+        model = Sequential()
+        model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+        model.add(Dropout(0.2))
+        model.add(LSTM(units = 50))
+        model.add(Dropout(0.2))
+        model.add(Dense(4))
+        model.compile(optimizer = "adam",loss = "mean_absolute_error", metrics=[
+            tf.keras.metrics.RootMeanSquaredError(name='rmse'),
+            tf.keras.metrics.MeanAbsolutePercentageError(name='mape')])
 
-    y_train = y_train[:, :6]
+    y_train = y_train[:, :4]
 
     start_time = time.time()
 
-    history = model.fit(X_train, y_train, epochs=400, batch_size=32, verbose=1, validation_split=0.2)
+    if ticker == "TLKM.JK":
+        epochs = 300
+    else:
+        epochs = 200
+    history = model.fit(X_train, y_train, epochs=epochs, batch_size=32, verbose=1, validation_split=0.2)
     end_time = time.time()
     training_time = end_time - start_time
 
@@ -351,13 +366,12 @@ def retraining_model(X_train, y_train,ticker):
 
 def recursive_prediction(steps, input_data, model,ticker,scaler):
     predictions = []
-    input_data = input_data
-    input_sequence = input_data[-steps:].reshape(1,steps,6)
+    input_sequence = input_data[-steps:].reshape(1,steps,4)
     
     for i in range(30):
         predicted_scaled = model.predict(input_sequence)
         
-        new_input = np.append(input_sequence[:, 1:, :], predicted_scaled.reshape(1,1,6), axis=1)
+        new_input = np.append(input_sequence[:, 1:, :], predicted_scaled.reshape(1,1,4), axis=1)
         input_sequence = new_input 
 
         normal_prediction_result = scaler.inverse_transform(predicted_scaled)
@@ -365,11 +379,11 @@ def recursive_prediction(steps, input_data, model,ticker,scaler):
        
         result = np.array(predictions).astype(int)
         if i == 6:
-            st.session_state['weekly_prediction'][ticker] = result.reshape(7,6)
+            st.session_state['weekly_prediction'][ticker] = result.reshape(7,4)
         elif i == 13:
-            st.session_state['biweekly_prediction'][ticker] = result.reshape(14,6)
+            st.session_state['biweekly_prediction'][ticker] = result.reshape(14,4)
         elif i == 29:
-            st.session_state['monthly_prediction'][ticker] = result.reshape(30,6)
+            st.session_state['monthly_prediction'][ticker] = result.reshape(30,4)
         
 
 
@@ -420,7 +434,8 @@ def update_model(windowed_data_x,windowed_data_y,current_time):
 
 def load_content():
     current_time = datetime.now()
-    if (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds() >= 1800 and st.session_state['predict_result']== {}:
+    is_need_update =  is_need_update_data()
+    if is_need_update :
         tickers = companies.keys()
         for ticker in tickers:
             data = fetch_data_yfinance(ticker, current_time)
@@ -433,16 +448,34 @@ def load_content():
         translated_text = get_translation(st.session_state['selected_language'], "last_update_at")
         st.info(f"{translated_text} {st.session_state['last_update_time']['time_yfinance_fetched']}")
     
+
+
+def is_need_update_data():
+    current_time = datetime.now()
+    new_data = fetch_data_yfinance("TLKM.JK", current_time)
+    cached_df = st.session_state['cached_data'].get("TLKM.JK")
+
+    if cached_df is None:
+        return True
+
+    if len(new_data) != len(cached_df):
+        return True
+
+    if new_data.index[-1] != cached_df.index[-1]:
+        return True
+
+    return False
+    
 def main():
-    try:
+    # try:
         st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
         selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
         selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
-
+        
         load_content()
         view_setup(selected_ticker)
-    except:
-        handling_view()
+    # except:
+    #     handling_view()
 
 
 
