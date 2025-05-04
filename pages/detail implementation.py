@@ -1,12 +1,48 @@
 import streamlit as st
 from PIL import Image
 from pages.session_config.lang_detail import get_translation 
+import base64
 
 st.set_page_config(
-    page_title="Detail",
+    page_title="Detail Impelemntasi",
     page_icon=":bulb:",
     layout="wide"
 )
+
+st.markdown("""
+<style>
+body {
+    background-color: "#FFFFFF";
+}
+</style>
+""", unsafe_allow_html=True)
+
+def get_base64_image(path):
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+logo1 = get_base64_image("./images/logo_kampus.png")
+logo2 = get_base64_image("./images/logo_kampus_merdeka.png")
+logo3 = get_base64_image("./images/logo_kemendikbud.png")
+st.markdown(f"""
+    <style>
+        .logo-container {{
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }}
+        .logo-container img {{
+            height: 50px;
+        }}
+    </style>
+    <div class="logo-container">
+        <img src="data:image/png;base64,{logo1}" />
+        <img src="data:image/png;base64,{logo2}" />
+        <img src="data:image/png;base64,{logo3}" />
+    </div>
+""", unsafe_allow_html=True)
+
 
 st.markdown("""
     <style>
@@ -38,7 +74,7 @@ if 'selected_language' not in st.session_state:
 st.title(get_translation(st.session_state['selected_language'], 'page_title'))
 
 # Tentang Halaman
-st.markdown(f"""<div style="background-color: #e6f0fa; padding: 15px; border-left: 6px solid #2c6faf; border-radius: 8px; font-size: 16px;">
+st.markdown(f"""<div style=" padding: 15px; border-left: 6px solid #2c6faf; border-radius: 8px; font-size: 16px;">
     <strong>{get_translation(st.session_state['selected_language'], 'about_this_page_label')}</strong><br>
     {get_translation(st.session_state['selected_language'], 'about_this_page')}</div>""", unsafe_allow_html=True)
 
@@ -48,8 +84,8 @@ st.markdown(f"""<div style="text-align: center; padding-top: 10px;">
 </div>""", unsafe_allow_html=True)
 
 # Gambar Python dan Yahoo Finance
-img_python_logo = Image.open('./pages/images/python-logo.png')
-img_yahoo_finance = Image.open('./pages/images/yahoo-finance_BIG.png')
+img_python_logo = Image.open('./images/python-logo.png')
+img_yahoo_finance = Image.open('./images/yahoo-finance_BIG.png')
 
 col1, col2 = st.columns([1, 1])
 with col1:
@@ -69,7 +105,7 @@ st.markdown(f"""<div style="background-color: #e6f0fa; padding: 15px; border-lef
 
 
 companies = {
-    "TLKM": "PT Telkom Indonesia (Persero) Tbk",
+    "TLKM": "PT Telkom Indonesia Tbk",
     "ISAT": "Indosat Tbk PT",
     "EXCL": "XL Axiata Tbk PT"
 }
@@ -115,7 +151,7 @@ with col2:
 st.write(f"### {get_translation(st.session_state['selected_language'], 'lstm_detail_label')}")
 
 
-img_lstm_cell = Image.open("./pages/images/lstm-flow.jpg")
+img_lstm_cell = Image.open("./images/lstm-flow.jpg")
 st.image(img_lstm_cell, caption="LSTM Flow Architecture", use_column_width="always")
 
 st.markdown(f"""
@@ -131,7 +167,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-img_lstm_cell = Image.open("./pages/images/lstm-cell.jpg")
+img_lstm_cell = Image.open("./images/lstm-cell.jpg")
 st.image(img_lstm_cell, caption="LSTM Cell Architecture",use_column_width="always")
 
 st.markdown(f"""
@@ -156,7 +192,7 @@ st.markdown(f"""
 > *"{get_translation(st.session_state['selected_language'], 'loss_curve_highlight')}"*
 """)
 
-st.image("./pages/images/loss-plot.png", caption="Loss result", use_column_width=True)
+st.image("./images/loss-plot.png", caption="Loss result", use_column_width=True)
 
 
 st.markdown(f"""
@@ -174,7 +210,7 @@ st.markdown(f"""
 """)
 
 # Display local RMSE formula image
-st.image("./pages/images/rmse.png", caption="RMSE Formula", use_column_width=False)
+st.image("./images/rmse.png", caption="RMSE Formula", use_column_width=False)
 
 st.markdown(f"""
 ---
@@ -187,7 +223,7 @@ st.markdown(f"""
 """)
 
 # Display local MAPE formula image
-st.image("./pages/images/mape.png", caption="MAPE Formula", use_column_width=False)
+st.image("./images/mape.png", caption="MAPE Formula", use_column_width=False)
 
 
 # Footer

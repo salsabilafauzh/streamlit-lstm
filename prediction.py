@@ -1,3 +1,5 @@
+import json
+import threading
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -12,9 +14,13 @@ import os
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 import time
+import base64
 
+from pages.session_config.background_fetcher import fetch_all
 from pages.session_config.history_training import load_training_history, save_training_history
-from pages.session_config.lang import get_translation 
+from pages.session_config.lang import get_translation
+from pages.session_config.fetched_data_to_json import  save_cached_data
+from pages.session_config.fetched_data_to_json import is_over_one_month
 
 st.set_page_config(
     page_title="Prediction - Telecommunication",
@@ -23,10 +29,37 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+def get_base64_image(path):
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+logo1 = get_base64_image("./images/logo_kampus.png")
+logo2 = get_base64_image("./images/logo_kampus_merdeka.png")
+logo3 = get_base64_image("./images/logo_kemendikbud.png")
+st.markdown(f"""
+    <style>
+        .logo-container {{
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }}
+        .logo-container img {{
+            height: 50px;
+        }}
+    </style>
+    <div class="logo-container">
+        <img src="data:image/png;base64,{logo1}" />
+        <img src="data:image/png;base64,{logo2}" />
+        <img src="data:image/png;base64,{logo3}" />
+    </div>
+""", unsafe_allow_html=True)
+
+
 st.markdown("""
     <style>
-        .reportview-container {
-            margin-top: -2em;
+        body {
+        background-color: "#FFFFFF";
         }
         #MainMenu {visibility: hidden;}
         .stDeployButton {display:none;}
@@ -42,12 +75,15 @@ st.markdown(
     .stAppDeployButton {
             visibility: hidden;
         }
+    div[data-testid="stStatusWidget"] div button {
+        display: none;
+        }
     </style>
     """, unsafe_allow_html=True
 )
 
 companies = {
-    "TLKM.JK": "Telkom Indonesia (Persero) Tbk [TLKM]",
+    "TLKM.JK": "Telkom Indonesia Tbk [TLKM]",
     "ISAT.JK": "Indosat Tbk [ISAT]",
     "EXCL.JK": "XL Axiata Tbk [EXCL]"
 }
@@ -62,6 +98,8 @@ language_options = {
 }
 
 features = ["Open","High","Low","Close"]
+DATA_DIR = "data"
+HISTORY_FILE = "training_history"
 
 #handling view
 def handling_view():
@@ -298,7 +336,6 @@ def view_setup(ticker):
 
 
 #PRE-PROCESSING
-@st.cache_data(ttl=1800)
 def fetch_data_yfinance(ticker_company, time_now):
     try:
         ticker = yf.Ticker(ticker_company)
@@ -391,29 +428,28 @@ def recursive_prediction(steps, input_data, model,ticker,scaler):
 def load_model_lstm(ticker):
     file_name = companies[ticker]
     if ticker == "TLKM.JK":
-        model=load_model(f"./pages/saved_model/{file_name}.h5",compile=False)
+        model=load_model(f"./saved_model/{file_name}.h5",compile=False)
     elif ticker == "EXCL.JK":
-        model = load_model(f"./pages/saved_model/{file_name}.h5",compile=False)
+        model = load_model(f"./saved_model/{file_name}.h5",compile=False)
     elif ticker == "ISAT.JK":
-        model = load_model(f"./pages/saved_model/{file_name}.h5",compile=False)
+        model = load_model(f"./saved_model/{file_name}.h5",compile=False)
    
     return model
 
-@st.cache_data(ttl=1800)
-def predict(ticker, data, current_time):
+
+def predict(ticker, data, last_update_time):
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled_data = scaler.fit_transform(data)
     windowed_data_x,windowed_data_y = reshape_data(scaled_data,5)
-    if current_time >= st.session_state['last_update_time']['next_date_update']:
-        update_model(windowed_data_x,windowed_data_y,current_time)
+    if is_over_one_month(datetime.now(), last_update_time) or last_update_time is None:
+        update_model(windowed_data_x,windowed_data_y)
         model_lstm = load_model_lstm(ticker)
     else:
         model_lstm = load_model_lstm(ticker)
-        model_lstm.summary()
     recursive_prediction(5,scaled_data,model_lstm,ticker,scaler)
 
 
-def update_model(windowed_data_x,windowed_data_y,current_time):
+def update_model(windowed_data_x,windowed_data_y):
 
     for _, (ticker, _) in enumerate(companies.items()):
         if ticker not in st.session_state['cached_data']:
@@ -424,67 +460,77 @@ def update_model(windowed_data_x,windowed_data_y,current_time):
 
         model_lstm.summary()
 
-        model_dir = "./pages/saved_model"
+        model_dir = "./saved_model"
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, f"{companies.get(ticker)}.h5")
         model_lstm.save(model_path)
 
-        st.session_state['last_update_time']['date_fetched'] = current_time
-        st.session_state['last_update_time']['next_date_update'] = current_time + relativedelta(months=1)
-
 def load_content():
-    current_time = datetime.now()
-    is_need_update =  is_need_update_data()
-    if is_need_update :
-        tickers = companies.keys()
-        for ticker in tickers:
-            data = fetch_data_yfinance(ticker, current_time)
-            df_selected_data = data[features]
-            st.session_state['cached_data'][ticker] = df_selected_data
-            st.session_state['last_update_time']['time_yfinance_fetched'] = current_time
-            predict(ticker, st.session_state['cached_data'][ticker], datetime.now())
-    else:
-        # time_left = 1800 - (current_time - st.session_state['last_update_time']['time_yfinance_fetched']).total_seconds()
-        translated_text = get_translation(st.session_state['selected_language'], "last_update_at")
-        st.info(f"{translated_text} {st.session_state['last_update_time']['time_yfinance_fetched']}")
+    all_data = {}
+    for ticker in companies.keys():    
+        data = fetch_data_yfinance(ticker, datetime.now())
+        if data.isnull().values.any():
+            data = data.fillna(method='ffill')
+        df_selected_data = data[features]
+        st.session_state['cached_data'][ticker] = df_selected_data
+
+        local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{ticker}.json")
+        if not os.path.exists(local_path_history):
+            predict(ticker, st.session_state['cached_data'][ticker], None)
+        else:
+            training_hist = load_training_history(ticker)
+            training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
+            last_update_time = training_hist["date"]
+            predict(ticker, st.session_state['cached_data'][ticker], last_update_time)
+        df_selected_data["Date"] = df_selected_data.index.strftime("%Y-%m-%d %H:%M:%S")
+        all_data[ticker] = df_selected_data
+    save_cached_data(all_data)
+
+
+def sync_data():
+    while True:
+        time.sleep(10)
+        if fetch_all():
+            load_content()
+        else:
+            print("Data is up to date")
     
-
-
-def is_need_update_data():
-    current_time = datetime.now()
-    new_data = fetch_data_yfinance("TLKM.JK", current_time)
-    cached_df = st.session_state['cached_data'].get("TLKM.JK")
-
-    if cached_df is None:
-        return True
-
-    if len(new_data) != len(cached_df):
-        return True
-
-    if new_data.index[-1] != cached_df.index[-1]:
-        return True
-
-    return False
+threading.Thread(target=sync_data, daemon=True).start()
     
 def main():
-    # try:
+    try:
         st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
         selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
         selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
+        local_path_raw_data = os.path.join(DATA_DIR, "cached_data.json")
+        local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{selected_ticker}.json")
+        if not os.path.exists(local_path_raw_data) or not os.path.exists(local_path_history):
+            load_content()
+        with open(local_path_raw_data, "r") as f:
+            raw_data = json.load(f)
+            training_hist = load_training_history(selected_ticker)
         
-        load_content()
+        df = pd.DataFrame(raw_data["cached_data"][selected_ticker])
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
+        last_update_time = training_hist["date"]
+        st.session_state['cached_data'][selected_ticker] = df
+        last_update_time = training_hist['date'].strftime("%Y-%m-%d %H:%M:%S")
+        
+        if selected_ticker not in st.session_state['weekly_prediction'] or selected_ticker not in st.session_state['biweekly_prediction'] or selected_ticker not in st.session_state['monthly_prediction']:
+            predict(selected_ticker, st.session_state['cached_data'][selected_ticker], last_update_time)
+            view_setup(selected_ticker)
         view_setup(selected_ticker)
-    # except:
-    #     handling_view()
+        sync_data()
+       
+    except:
+        handling_view()
 
-
-
- #konfigurasi session
-if 'last_update_time' not in st.session_state:
-    st.session_state['last_update_time'] = {}
-    st.session_state['last_update_time']['date_fetched'] = datetime.now()
-    st.session_state['last_update_time']['next_date_update'] = datetime.now() + relativedelta(months=1)
-    st.session_state['last_update_time']['time_yfinance_fetched'] = datetime.now() - timedelta(minutes=30)  
+if "fetch_thread_started" not in st.session_state:
+    thread = threading.Thread(target=sync_data, daemon=True)
+    thread.start()
+    st.session_state["fetch_thread_started"] = True
 
 if 'cached_data' not in st.session_state:
     st.session_state['cached_data'] = {}
@@ -506,7 +552,6 @@ if 'plot_type' not in st.session_state:
 
 if 'trend_type' not in st.session_state:
     st.session_state.trend_type = "WEEKLY"
-
 
 if "selected_language" not in st.session_state:
     st.session_state["selected_language"] = "id"

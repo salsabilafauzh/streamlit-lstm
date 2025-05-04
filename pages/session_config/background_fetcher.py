@@ -1,33 +1,61 @@
-import yfinance as yf
-import time
-import json
 import os
+import json
+import pandas as pd
+from datetime import datetime, timedelta
+import yfinance as yf 
 
-TICKERS = ["TLKM", "ISAT", "EXCL"]
-PERIOD = "5d"
-CHECK_INTERVAL = 3600
+DATA_DIR = "data"
+CACHED_FILE = os.path.join(DATA_DIR, "cached_data.json")
+features = ["Open","High","Low","Close"]
+DATA_DIR = "data"
+HISTORY_FILE = "training_history"
+companies = {
+    "TLKM.JK": "Telkom Indonesia Tbk [TLKM]",
+    "ISAT.JK": "Indosat Tbk [ISAT]",
+    "EXCL.JK": "XL Axiata Tbk [EXCL]"
+}
 
 def fetch_all():
-    last_dates = {}
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    while True:
-        status = {}
-        for ticker in TICKERS:
-            data = yf.download(ticker, period=PERIOD)
-            latest_date = data.index[-1].strftime('%Y-%m-%d')
-            is_updated = (
-                ticker not in last_dates or latest_date != last_dates[ticker]
-            )
-            data_filename = f"stock_data_{ticker}.json"
-            data.to_json(data_filename)
-            status[ticker] = is_updated
+    # Load cached data
+    cached_data = {}
+    if os.path.exists(CACHED_FILE):
+        with open(CACHED_FILE, "r") as f:
+            raw = json.load(f)
+            for ticker, records in raw["cached_data"].items():
+                df = pd.DataFrame(records)
+                df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+                df.set_index("Date", inplace=True)
+                cached_data[ticker] = df
+    else:
+        return True, {}  # Kalau belum ada cache, anggap perlu update
 
-            last_dates[ticker] = latest_date
+    updated = False
+    all_data = {}
+    current_time = datetime.now().replace(tzinfo=None)
 
-        with open("data_status.json", "w") as f:
-            json.dump(status, f)
+    for ticker in companies.keys():
+        # Ambil cache terakhir
+        df_cached = cached_data.get(ticker, pd.DataFrame())
+        last_cached_date = df_cached.index.max() if not df_cached.empty else None
 
-        time.sleep(CHECK_INTERVAL)
+        # Fetch 5 hari terakhir
+        ticker = yf.Ticker(ticker)
+        start_date = current_time - timedelta(days=5)
+        df_new = ticker.history(start=start_date, end=current_time, auto_adjust=False)
+        if df_new is None or df_new.empty:
+            all_data[ticker] = df_cached
+            continue
 
-if __name__ == "__main__":
-    fetch_all()
+        df_new = df_new[features]
+        df_new.index = pd.to_datetime(df_new.index).tz_localize(None)
+        df_new = df_new[~df_new.index.duplicated(keep='last')]
+        last_fetched_date = df_new.index.max()
+
+        last_cached_date = df_cached.index.max() if not df_cached.empty else None
+        last_fetched_date = df_new.index.max()
+        if last_cached_date is None or last_fetched_date > last_cached_date:
+            updated = True
+
+    return updated
