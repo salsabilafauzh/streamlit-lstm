@@ -1,6 +1,5 @@
 import streamlit as st
-from PIL import Image
-from pages.session_config.lang_detail import get_translation 
+from pages.session_config.lang_detail import get_translation
 import base64
 
 st.set_page_config(
@@ -17,9 +16,12 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
+
 def get_base64_image(path):
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
+
+
 logo1 = get_base64_image("./images/logo_kampus.png")
 logo2 = get_base64_image("./images/logo_kampus_merdeka.png")
 logo3 = get_base64_image("./images/logo_kemendikbud.png")
@@ -66,11 +68,12 @@ st.markdown(
     </style>
     """, unsafe_allow_html=True
 )
-st.markdown("""<style> .reportview-container { margin-top: -2em; } #MainMenu {visibility: hidden;} .stDeployButton {display:none;} footer {visibility: hidden;} #stDecoration {display:none;} </style>""", unsafe_allow_html=True)
+st.markdown(
+    """<style> .reportview-container { margin-top: -2em; } #MainMenu {visibility: hidden;} .stDeployButton {display:none;} footer {visibility: hidden;} #stDecoration {display:none;} </style>""", unsafe_allow_html=True)
 
 
 if 'selected_language' not in st.session_state:
-    st.session_state['selected_language'] = 'id'  
+    st.session_state['selected_language'] = 'id'
 st.title(get_translation(st.session_state['selected_language'], 'page_title'))
 
 # Tentang Halaman
@@ -84,14 +87,16 @@ st.markdown(f"""<div style="text-align: center; padding-top: 10px;">
 </div>""", unsafe_allow_html=True)
 
 # Gambar Python dan Yahoo Finance
-img_python_logo = Image.open('./images/python-logo.png')
-img_yahoo_finance = Image.open('./images/yahoo-finance_BIG.png')
+img_python_logo = get_base64_image('./images/python-logo.png')
+img_yahoo_finance = get_base64_image('./images/yahoo-finance_BIG.png')
 
 col1, col2 = st.columns([1, 1])
 with col1:
-   st.image(img_python_logo, width="auto", caption="Python", use_column_width="auto")
+    st.image(img_python_logo, width="auto",
+             caption="Python", use_column_width="auto")
 with col2:
-    st.image(img_yahoo_finance, width="auto", caption="Yahoo Finance", use_column_width="auto")
+    st.image(img_yahoo_finance, width="auto",
+             caption="Yahoo Finance", use_column_width="auto")
 
 st.markdown(f"""<div style="padding: 10px 0;">
     <h4 style='margin-bottom: 5px;'>{get_translation(st.session_state['selected_language'], 'time_range')}</h4>
@@ -141,18 +146,24 @@ st.markdown(f"""
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown(f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_train_label')}</div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align: center; font-size: 28px; color: green;'>80%</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_train_label')}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; font-size: 28px; color: green;'>80%</div>",
+                unsafe_allow_html=True)
 
 with col2:
-    st.markdown(f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_test_label')}</div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align: center; font-size: 28px; color: orange;'>20%</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='text-align: center; font-weight: bold;'>{get_translation(st.session_state['selected_language'], 'data_test_label')}</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; font-size: 28px; color: orange;'>20%</div>",
+                unsafe_allow_html=True)
 
-st.write(f"### {get_translation(st.session_state['selected_language'], 'lstm_detail_label')}")
+st.write(
+    f"### {get_translation(st.session_state['selected_language'], 'lstm_detail_label')}")
 
 
-img_lstm_cell = Image.open("./images/lstm-flow.jpg")
-st.image(img_lstm_cell, caption="LSTM Flow Architecture", use_column_width="always")
+img_lstm_cell = get_base64_image("./images/lstm-flow.jpg")
+st.image(img_lstm_cell, caption="LSTM Flow Architecture",
+         use_column_width="always")
 
 st.markdown(f"""
 <div style="
@@ -167,8 +178,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-img_lstm_cell = Image.open("./images/lstm-cell.jpg")
-st.image(img_lstm_cell, caption="LSTM Cell Architecture",use_column_width="always")
+img_lstm_cell = get_base64_image("./images/lstm-cell.jpg")
+st.image(img_lstm_cell, caption="LSTM Cell Architecture",
+         use_column_width="always")
 
 st.markdown(f"""
 <div style="
