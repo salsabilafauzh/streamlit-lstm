@@ -29,6 +29,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+st.markdown("""
+    <style>
+        body {
+        background-color: #FFFFFF;
+        }
+        #MainMenu {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
+""", unsafe_allow_html=True)
+
 def get_base64_image(path):
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
@@ -56,18 +68,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-st.markdown("""
-    <style>
-        body {
-        background-color: "#FFFFFF";
-        }
-        #MainMenu {visibility: hidden;}
-        .stDeployButton {display:none;}
-        footer {visibility: hidden;}
-        #stDecoration {display:none;}
-    </style>
-""", unsafe_allow_html=True)
-
 
 st.markdown(
     r"""
@@ -75,9 +75,10 @@ st.markdown(
     .stAppDeployButton {
             visibility: hidden;
         }
-    div[data-testid="stStatusWidget"] div button {
-        display: none;
-        }
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 18px !important;
+        margin-bottom: 10px;
+    }
     </style>
     """, unsafe_allow_html=True
 )
@@ -239,7 +240,15 @@ def view_setup(ticker):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown(get_translation(st.session_state['selected_language'], "configuration_title"))
+      st.markdown(
+    f"""
+    <p style='font-size: 18px; margin-bottom: 15px;'>
+        {get_translation(st.session_state['selected_language'], "configuration_title")}
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+
     with col2:
             st.radio(
             get_translation(st.session_state['selected_language'], "change_graph"),
@@ -308,31 +317,8 @@ def view_setup(ticker):
 
     st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
-    if history_training is None:
-        st.warning(get_translation(st.session_state['selected_language'], "no_training_history"))
-    else:
-        plot_history_training(history_training)
+    plot_history_training(history_training)
 
-    st.markdown(
-    f"""
-    <style>
-    .footer {{
-        bottom: 0;
-        width: 100%;
-        background-color: #f0f2f6;
-        color: #666;
-        text-align: center;
-        padding: 10px;
-        font-size: 14px;
-        border-top: 1px solid #ccc;
-    }}
-    </style>
-    <div class="footer">
-        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 
 #PRE-PROCESSING
@@ -489,7 +475,7 @@ def load_content():
 
 def sync_data():
     while True:
-        time.sleep(10)
+        time.sleep(60)
         if fetch_all():
             load_content()
         else:
@@ -498,34 +484,59 @@ def sync_data():
 threading.Thread(target=sync_data, daemon=True).start()
     
 def main():
-    try:
-        st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
-        selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
-        selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
-        local_path_raw_data = os.path.join(DATA_DIR, "cached_data.json")
-        local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{selected_ticker}.json")
-        if not os.path.exists(local_path_raw_data) or not os.path.exists(local_path_history):
-            load_content()
-        with open(local_path_raw_data, "r") as f:
-            raw_data = json.load(f)
-            training_hist = load_training_history(selected_ticker)
-        
-        df = pd.DataFrame(raw_data["cached_data"][selected_ticker])
-        df['Date'] = pd.to_datetime(df['Date'])
-        df.set_index('Date', inplace=True)
-        training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
-        last_update_time = training_hist["date"]
-        st.session_state['cached_data'][selected_ticker] = df
-        last_update_time = training_hist['date'].strftime("%Y-%m-%d %H:%M:%S")
-        
-        if selected_ticker not in st.session_state['weekly_prediction'] or selected_ticker not in st.session_state['biweekly_prediction'] or selected_ticker not in st.session_state['monthly_prediction']:
-            predict(selected_ticker, st.session_state['cached_data'][selected_ticker], last_update_time)
-            view_setup(selected_ticker)
-        view_setup(selected_ticker)
-        sync_data()
-       
-    except:
-        handling_view()
+    
+    # try:
+    st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
+    selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
+    
+    selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
+    local_path_raw_data = os.path.join(DATA_DIR, "cached_data.json")
+    local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{selected_ticker}.json")
+
+    if not os.path.exists(local_path_raw_data) or not os.path.exists(local_path_history):
+        load_content()
+    with open(local_path_raw_data, "r") as f:
+        raw_data = json.load(f)
+        training_hist = load_training_history(selected_ticker)
+    
+    df = pd.DataFrame(raw_data["cached_data"][selected_ticker])
+    df['Date'] = pd.to_datetime(df['Date'])
+    df.set_index('Date', inplace=True)
+    training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
+    last_update_time = training_hist["date"]
+    st.session_state['cached_data'][selected_ticker] = df
+    last_update_time = training_hist['date'].strftime("%Y-%m-%d %H:%M:%S")
+    
+    if selected_ticker not in st.session_state['weekly_prediction'] or selected_ticker not in st.session_state['biweekly_prediction'] or selected_ticker not in st.session_state['monthly_prediction']:
+        predict(selected_ticker, st.session_state['cached_data'][selected_ticker], last_update_time)
+    view_setup(selected_ticker)
+    footer = st.empty()
+    footer.markdown(
+    f"""
+    <style>
+    .footer {{
+    width:100%;
+    height:60px;  
+    background:#6cf;
+    bottom: 0;
+    width: 100%;
+    background-color: #f0f2f6;
+    color: #666;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    border-top: 1px solid #ccc;
+    }}
+    </style>
+    <div class="footer">
+        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+    )
+    sync_data()
+    # except:
+    #     handling_view()
 
 if "fetch_thread_started" not in st.session_state:
     thread = threading.Thread(target=sync_data, daemon=True)

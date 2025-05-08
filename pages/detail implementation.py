@@ -9,18 +9,27 @@ st.set_page_config(
 )
 
 st.markdown("""
-<style>
-body {
-    background-color: "#FFFFFF";
-}
-</style>
+    <style>
+        body {
+        background-color: #FFFFFF;
+        }
+        #MainMenu {visibility: hidden;}
+        .stDeployButton {display:none;}
+        footer {visibility: hidden;}
+        #stDecoration {display:none;}
+    </style>
 """, unsafe_allow_html=True)
-
 
 def get_base64_image(path):
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
-
+    
+def get_base64_image_datauri(path):
+    ext = path.split('.')[-1]
+    mime = f"image/{ext if ext != 'jpg' else 'jpeg'}"
+    with open(path, "rb") as img_file:
+        base64_str = base64.b64encode(img_file.read()).decode()
+        return f"data:{mime};base64,{base64_str}"
 
 logo1 = get_base64_image("./images/logo_kampus.png")
 logo2 = get_base64_image("./images/logo_kampus_merdeka.png")
@@ -87,15 +96,15 @@ st.markdown(f"""<div style="text-align: center; padding-top: 10px;">
 </div>""", unsafe_allow_html=True)
 
 # Gambar Python dan Yahoo Finance
-img_python_logo = get_base64_image('./images/python-logo.png')
-img_yahoo_finance = get_base64_image('./images/yahoo-finance_BIG.png')
+img_python_logo = './images/python-logo.png'
+img_yahoo_finance = './images/yahoo-finance_BIG.png'
 
 col1, col2 = st.columns([1, 1])
 with col1:
-    st.image(img_python_logo, width="auto",
+    st.image(get_base64_image_datauri(img_python_logo), width="auto",
              caption="Python", use_column_width="auto")
 with col2:
-    st.image(img_yahoo_finance, width="auto",
+    st.image(get_base64_image_datauri(img_yahoo_finance), width="auto",
              caption="Yahoo Finance", use_column_width="auto")
 
 st.markdown(f"""<div style="padding: 10px 0;">
@@ -161,8 +170,8 @@ st.write(
     f"### {get_translation(st.session_state['selected_language'], 'lstm_detail_label')}")
 
 
-img_lstm_cell = get_base64_image("./images/lstm-flow.jpg")
-st.image(img_lstm_cell, caption="LSTM Flow Architecture",
+img_lstm_flow = "./images/lstm-flow.jpg"
+st.image(get_base64_image_datauri(img_lstm_flow), caption="LSTM Flow Architecture",
          use_column_width="always")
 
 st.markdown(f"""
@@ -178,8 +187,8 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-img_lstm_cell = get_base64_image("./images/lstm-cell.jpg")
-st.image(img_lstm_cell, caption="LSTM Cell Architecture",
+img_lstm_cell = "./images/lstm-cell.jpg"
+st.image(get_base64_image_datauri(img_lstm_cell), caption="LSTM Cell Architecture",
          use_column_width="always")
 
 st.markdown(f"""
@@ -204,7 +213,8 @@ st.markdown(f"""
 > *"{get_translation(st.session_state['selected_language'], 'loss_curve_highlight')}"*
 """)
 
-st.image("./images/loss-plot.png", caption="Loss result", use_column_width=True)
+loss_plot = "./images/loss-plot.png"
+st.image(get_base64_image_datauri(loss_plot), caption="Loss result", use_column_width=True)
 
 
 st.markdown(f"""
@@ -222,7 +232,8 @@ st.markdown(f"""
 """)
 
 # Display local RMSE formula image
-st.image("./images/rmse.png", caption="RMSE Formula", use_column_width=False)
+rmse_formula = "./images/rmse.png"
+st.image(get_base64_image_datauri(rmse_formula), caption="RMSE Formula", use_column_width=False)
 
 st.markdown(f"""
 ---
@@ -235,7 +246,8 @@ st.markdown(f"""
 """)
 
 # Display local MAPE formula image
-st.image("./images/mape.png", caption="MAPE Formula", use_column_width=False)
+mape_formula = "./images/mape.png"
+st.image(get_base64_image_datauri(mape_formula), caption="MAPE Formula", use_column_width=False)
 
 
 # Footer
