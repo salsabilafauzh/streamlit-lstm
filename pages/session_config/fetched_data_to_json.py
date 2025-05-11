@@ -47,32 +47,12 @@ def save_cached_data(cached_data):
             'time_yfinance_fetched': current_time.isoformat()
         }
     }
-
-    # Save to temporary file first
     with tempfile.NamedTemporaryFile('w', delete=False, dir=DATA_DIR, suffix='.json') as tmp_file:
         json.dump(serializable_data, tmp_file, indent=2)
         temp_path = tmp_file.name
 
-    # Rename to final file
     final_path = os.path.join(DATA_DIR, "cached_data.json")
     os.replace(temp_path, final_path)
-
-
-def is_need_update(loaded_data):
-    for ticker in TICKERS:
-        local_last_date = pd.to_datetime(loaded_data.index[-1]).date()
-
-        # Fetch data terbaru
-        remote_data = yf.download(ticker, period=PERIOD)
-        if remote_data.empty:
-            continue  # Skip, atau bisa raise warning
-        remote_last_date = remote_data.index[-1].date()
-
-        # Bandingkan tanggal terakhir
-        if remote_last_date != local_last_date:
-            return True
-
-    return False
 
 def is_over_one_month(current_time, last_update_time):
     if not last_update_time:

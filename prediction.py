@@ -21,6 +21,8 @@ from pages.session_config.history_training import load_training_history, save_tr
 from pages.session_config.lang import get_translation
 from pages.session_config.fetched_data_to_json import  save_cached_data
 from pages.session_config.fetched_data_to_json import is_over_one_month
+from pages.session_config.session_check import session_start
+from pages.session_config.store_prediction import load_predictions, save_predictions
 
 st.set_page_config(
     page_title="Prediction - Telecommunication",
@@ -101,6 +103,7 @@ language_options = {
 features = ["Open","High","Low","Close"]
 DATA_DIR = "data"
 HISTORY_FILE = "training_history"
+CACHE_DATA_FILE = "cached_data.json"
 
 #handling view
 def handling_view():
@@ -318,6 +321,32 @@ def view_setup(ticker):
     st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
     plot_history_training(history_training)
+    
+    footer = st.empty()
+    footer.markdown(
+    f"""
+    <style>
+    .footer {{
+    width:100%;
+    height:60px;  
+    background:#6cf;
+    bottom: 0;
+    width: 100%;
+    background-color: #f0f2f6;
+    color: #666;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    border-top: 1px solid #ccc;
+    }}
+    </style>
+    <div class="footer">
+        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+    )
+    
 
 
 
@@ -407,7 +436,6 @@ def recursive_prediction(steps, input_data, model,ticker,scaler):
             st.session_state['biweekly_prediction'][ticker] = result.reshape(14,4)
         elif i == 29:
             st.session_state['monthly_prediction'][ticker] = result.reshape(30,4)
-        
 
 
 @st.cache_resource  
@@ -463,15 +491,34 @@ def load_content():
         local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{ticker}.json")
         if not os.path.exists(local_path_history):
             predict(ticker, st.session_state['cached_data'][ticker], None)
+            save_predictions()
         else:
             training_hist = load_training_history(ticker)
             training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
             last_update_time = training_hist["date"]
             predict(ticker, st.session_state['cached_data'][ticker], last_update_time)
+            save_predictions()
         df_selected_data["Date"] = df_selected_data.index.strftime("%Y-%m-%d %H:%M:%S")
         all_data[ticker] = df_selected_data
     save_cached_data(all_data)
 
+def load_content_from_cache(ticker):
+    if ticker not in st.session_state['cached_data']:
+        local_path_raw_data = os.path.join(DATA_DIR, CACHE_DATA_FILE)
+        local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{ticker}.json")
+        if not os.path.exists(local_path_raw_data) or not os.path.exists(local_path_history):
+            load_content()
+        with open(local_path_raw_data, "r") as f:
+            raw_data = json.load(f)
+            training_hist = load_training_history(ticker)
+        
+        df = pd.DataFrame(raw_data["cached_data"][ticker])
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
+        st.session_state['cached_data'][ticker] = df
+        if ticker not in st.session_state['weekly_prediction'] or st.session_state['biweekly_prediction'] or st.session_state['monthly_prediction']:
+            load_predictions()
 
 def sync_data():
     while True:
@@ -481,94 +528,21 @@ def sync_data():
         else:
             print("Data is up to date")
     
-threading.Thread(target=sync_data, daemon=True).start()
-    
 def main():
     
     # try:
     st.write(f"# {get_translation(st.session_state['selected_language'], 'title')}")
     selected_company = st.selectbox(get_translation(st.session_state['selected_language'], "select_company"), companies.values())
-    
     selected_ticker = next((key for key, value in companies.items() if value == selected_company), None)
-    local_path_raw_data = os.path.join(DATA_DIR, "cached_data.json")
-    local_path_history = os.path.join(DATA_DIR, f"{HISTORY_FILE}_{selected_ticker}.json")
-
-    if not os.path.exists(local_path_raw_data) or not os.path.exists(local_path_history):
-        load_content()
-    with open(local_path_raw_data, "r") as f:
-        raw_data = json.load(f)
-        training_hist = load_training_history(selected_ticker)
-    
-    df = pd.DataFrame(raw_data["cached_data"][selected_ticker])
-    df['Date'] = pd.to_datetime(df['Date'])
-    df.set_index('Date', inplace=True)
-    training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
-    last_update_time = training_hist["date"]
-    st.session_state['cached_data'][selected_ticker] = df
-    last_update_time = training_hist['date'].strftime("%Y-%m-%d %H:%M:%S")
-    
-    if selected_ticker not in st.session_state['weekly_prediction'] or selected_ticker not in st.session_state['biweekly_prediction'] or selected_ticker not in st.session_state['monthly_prediction']:
-        predict(selected_ticker, st.session_state['cached_data'][selected_ticker], last_update_time)
+    load_content_from_cache(selected_ticker)
     view_setup(selected_ticker)
-    footer = st.empty()
-    footer.markdown(
-    f"""
-    <style>
-    .footer {{
-    width:100%;
-    height:60px;  
-    background:#6cf;
-    bottom: 0;
-    width: 100%;
-    background-color: #f0f2f6;
-    color: #666;
-    text-align: center;
-    padding: 10px;
-    font-size: 14px;
-    border-top: 1px solid #ccc;
-    }}
-    </style>
-    <div class="footer">
-        <b>{get_translation(st.session_state['selected_language'], 'copyright')}</b>
-    </div>
-    """,
-    unsafe_allow_html=True
-    )
-    sync_data()
     # except:
     #     handling_view()
 
-if "fetch_thread_started" not in st.session_state:
-    thread = threading.Thread(target=sync_data, daemon=True)
-    thread.start()
-    st.session_state["fetch_thread_started"] = True
-
-if 'cached_data' not in st.session_state:
-    st.session_state['cached_data'] = {}
-
-if 'predict_result' not in st.session_state:
-    st.session_state['predict_result']={}
-
-if 'weekly_prediction' not in st.session_state:
-    st.session_state['weekly_prediction']={}
-
-if 'biweekly_prediction' not in st.session_state:
-    st.session_state['biweekly_prediction']={}
-
-if 'monthly_prediction' not in st.session_state:
-    st.session_state['monthly_prediction']={}
-
-if 'plot_type' not in st.session_state:
-    st.session_state.plot_type = "time series"
-
-if 'trend_type' not in st.session_state:
-    st.session_state.trend_type = "WEEKLY"
-
-if "selected_language" not in st.session_state:
-    st.session_state["selected_language"] = "id"
-
-if "language_selector" not in st.session_state:
-    st.session_state["language_selector"] = "Indonesia"
+session_start()
+if 'sync_thread_started' not in st.session_state:
+    threading.Thread(target=sync_data, daemon=True).start()
+    st.session_state['sync_thread_started'] = True
 
 
 if __name__ == "__main__":
