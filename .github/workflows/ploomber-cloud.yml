@@ -23,6 +23,6 @@ jobs:
 
       - name: Deploy
         env:
-          PLOOMBER_CLOUD_KEY: ${{ secrets.PLOOMBER_CLOUD_KEY }}
+          PLOOMBER_CLOUD_KEY: ${{ secrets.ploombercloud }}
         run: |
           ploomber-cloud deploy --watch-incremental
