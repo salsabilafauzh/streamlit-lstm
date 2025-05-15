@@ -8,6 +8,7 @@ font="sans serif"
 
 [client]
 toolbarMode = "viewer"
+showErrorDetails = "none"
 
 
 [browser]
