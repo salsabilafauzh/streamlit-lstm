@@ -37,6 +37,7 @@ st.markdown("""
         background-color: #FFFFFF;
         }
         #MainMenu {visibility: hidden;}
+        .stAppToolbar {visibility: hidden;}
         .stDeployButton {display:none;}
         footer {visibility: hidden;}
         #stDecoration {display:none;}
@@ -317,7 +318,7 @@ def view_setup(ticker):
             unsafe_allow_html=True
     )
 
-
+    styled_sorted_df.index.name = "Date"
     st.dataframe(styled_sorted_df,use_container_width=True)
     history_training = load_training_history(ticker)
     plot_history_training(history_training)
@@ -518,6 +519,7 @@ def load_content_from_cache(ticker):
         training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
         st.session_state['cached_data'][ticker] = df
         if ticker not in st.session_state['weekly_prediction'] or st.session_state['biweekly_prediction'] or st.session_state['monthly_prediction']:
+            print("No prediction data found, generating new predictions.")
             load_predictions()
 
 def sync_data():
