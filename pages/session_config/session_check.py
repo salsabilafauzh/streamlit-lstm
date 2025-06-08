@@ -18,7 +18,7 @@ def session_start():
         st.session_state['monthly_prediction']={}
 
     if 'plot_type' not in st.session_state:
-        st.session_state.plot_type = "time series"
+        st.session_state.plot_type = "candle"
 
     if 'trend_type' not in st.session_state:
         st.session_state.trend_type = "WEEKLY"

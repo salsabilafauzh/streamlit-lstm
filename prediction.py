@@ -199,18 +199,6 @@ def plot_history_training(history):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-def highlight_predicted_data(row):
-    if isinstance(row.name, pd.Timestamp): 
-        index_value = row.name.toordinal()  
-    else:
-        index_value = row.name  
-    num_days = trends.get(st.session_state["trend_type"], 7)
-
-    num_cols = len(row)  
-
-    if index_value < num_days:
-        return ["background-color: red"] * num_cols 
-    return [""] * num_cols  
 
 def change_language():
     lang_code = language_options[st.session_state["language_selector"]]
@@ -290,7 +278,7 @@ def view_setup(ticker):
     data = pd.concat([existing_data, predicted_df])
     desc_sorted_data = data.sort_index(ascending=False)
     
-    styled_sorted_df = desc_sorted_data.style.apply(highlight_predicted_data, axis=1)
+    styled_sorted_df = desc_sorted_data
 
     plot_data(existing_data,predicted_df,ticker,st.session_state.plot_type)
     
