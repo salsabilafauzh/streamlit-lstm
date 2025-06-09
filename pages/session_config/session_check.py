@@ -38,6 +38,9 @@ def session_start():
     if 'monthly_prediction' not in st.session_state:
         st.session_state['monthly_prediction']={}
 
+    if 'predicted_data_testing' not in st.session_state:
+        st.session_state['predicted_data_testing'] = {}
+
     if 'plot_type' not in st.session_state:
         st.session_state.plot_type = "time series"
 

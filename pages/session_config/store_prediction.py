@@ -22,23 +22,18 @@ def save_predictions():
     }
 
     for period in ["weekly", "biweekly", "monthly"]:
-        # Save predictions
         for ticker, arr in st.session_state.get(f"{period}_prediction", {}).items():
             saved_data[f"{period}_prediction"][ticker] = arr.tolist()
         
-        # Save lower CI
         for ticker, arr in st.session_state.get(f"{period}_lower_ci", {}).items():
             saved_data[f"{period}_lower_ci"][ticker] = arr.tolist()
         
-        # Save upper CI
         for ticker, arr in st.session_state.get(f"{period}_upper_ci", {}).items():
             saved_data[f"{period}_upper_ci"][ticker] = arr.tolist()
 
-    # Save std_residual
     for ticker, val in st.session_state.get("std_residual", {}).items():
         saved_data["std_residual"][ticker] = float(val)
 
-    # Save to JSON file
     path = os.path.join(DATA_DIR, "predictions.json")
     with open(path, "w") as f:
         json.dump(saved_data, f)

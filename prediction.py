@@ -18,6 +18,7 @@ import time
 import base64
 
 from pages.session_config.background_fetcher import fetch_all
+from pages.session_config.data_testing_prediction import load_predicted_line_json, save_predicted_line_json
 from pages.session_config.history_training import load_training_history, save_training_history
 from pages.session_config.lang import get_translation
 from pages.session_config.fetched_data_to_json import  save_cached_data
@@ -116,15 +117,12 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
     st.subheader(f"{get_translation(st.session_state['selected_language'], 'title_prediction_result')}")
 
     if predicted_df.index is None or len(predicted_df.index) == 0:
-        # last_date = existing_data.index[-1]
-        # predicted_df.index = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=len(predicted_df), freq='B')
         last_date = existing_data.index[-1]
 
         next_business_day = pd.bdate_range(start=last_date + pd.Timedelta(days=1), periods=1)[0]
         predicted_df.index = pd.bdate_range(start=next_business_day, periods=len(predicted_df))
 
     if plot_type == 'candle':
-        # Candlestick chart
         fig = go.Figure()
 
         fig.add_trace(go.Candlestick(
@@ -132,6 +130,18 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
             low=existing_data["Low"], close=existing_data["Close"],
             name=f"{get_translation(st.session_state['selected_language'], 'existing_data')}"
         ))
+
+        data_test_prediction = load_predicted_line_json(ticker)
+        prediction_ohlc_df = data_test_prediction['prediction'].apply(pd.Series)
+        if 'predicted_data_testing' not in st.session_state or st.session_state['predicted_data_testing'] is None:
+            st.session_state['predicted_data_testing']  = data_test_prediction
+        colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
+        for feature in ["Open", "High", "Low", "Close"]:
+            fig.add_trace(go.Scatter(
+                x=data_test_prediction["date"], y=prediction_ohlc_df[feature],
+                mode="lines", name=f"Predicted {feature} (data testing)",
+                line=dict(color=colors[feature])
+            ))
 
         fig.add_trace(go.Candlestick(
             x=predicted_df.index, open=predicted_df["Open"], high=predicted_df["High"],
@@ -167,7 +177,6 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        # Line chart with all features
         fig = go.Figure()
         colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
 
@@ -389,12 +398,13 @@ def fetch_data_yfinance(ticker_company, time_now):
         print(f"Error: {e}")
 
 
-def reshape_data(data, time_step):
-    X, y = [], []
+def reshape_data(data, dates, time_step):
+    x, y, y_dates = [], [], []
     for i in range(time_step, len(data)):
-        X.append(data[i-time_step:i, :])
-        y.append(data[i, :])
-    return np.array(X), np.array(y)
+        x.append(data[i-time_step:i])
+        y.append(data[i])
+        y_dates.append(dates[i])
+    return np.array(x), np.array(y), np.array(y_dates)
 
 
 #TRAINING & LOAD PREDICTION
@@ -439,24 +449,33 @@ def retraining_model(X_train, y_train,ticker):
     return model
 
 
+import numpy as np
+import pandas as pd
+from scipy import stats
+import streamlit as st
 
-def recursive_prediction(steps, test_windowed_x, test_windowed_y, test_data, model, ticker, scaler):
+def recursive_prediction(steps, test_windowed_x, test_windowed_y, test_data, test_dates,model, ticker, scaler):
     predictions = []
     lower_ci = []
     upper_ci = []
 
     pred_scaled_on_test = model.predict(test_windowed_x)
     pred_inverse_on_test = scaler.inverse_transform(pred_scaled_on_test)
-
     actual_inverse = scaler.inverse_transform(test_windowed_y)
-    actual_close = actual_inverse[:, 3]
+
+    save_predicted_line_json(pred_inverse_on_test,test_dates,ticker)
+
+    actual_close = actual_inverse[:, 3]   
     predicted_close = pred_inverse_on_test[:, 3]
     residuals_close = actual_close - predicted_close
     std_residual = np.std(residuals_close)
 
     st.session_state['std_residual'][ticker] = std_residual
 
-    input_sequence = test_data[-5:].reshape(1, steps, 4)
+    input_sequence = test_data[-steps:].reshape(1, steps, test_data.shape[1])
+
+    last_date = test_dates[-1]
+    pred_dates = pd.bdate_range(start=last_date + pd.Timedelta(days=1), periods=30)
 
     for i in range(30):
         predicted_scaled = model.predict(input_sequence)
@@ -468,21 +487,24 @@ def recursive_prediction(steps, test_windowed_x, test_windowed_y, test_data, mod
         lower_ci.append(ci[0])
         upper_ci.append(ci[1])
 
-        input_sequence = np.append(input_sequence[:, 1:, :], predicted_scaled.reshape(1, 1, 4), axis=1)
+        predicted_scaled_reshaped = predicted_scaled.reshape(1, 1, test_data.shape[1])
+        input_sequence = np.append(input_sequence[:, 1:, :], predicted_scaled_reshaped, axis=1)
 
-        # Store predictions + confidence intervals at the appropriate step
-        if i == 6: 
-            st.session_state['weekly_prediction'][ticker] = np.array(predictions).reshape(7, 4)
-            st.session_state['weekly_lower_ci'][ticker] = np.array(lower_ci).reshape(7)
-            st.session_state['weekly_upper_ci'][ticker] = np.array(upper_ci).reshape(7)
+        if i == 6:
+            st.session_state['weekly_prediction'][ticker] = np.array(predictions[:7]).reshape(7, test_data.shape[1])
+            st.session_state['weekly_lower_ci'][ticker] = np.array(lower_ci[:7])
+            st.session_state['weekly_upper_ci'][ticker] = np.array(upper_ci[:7])
         elif i == 13:
-            st.session_state['biweekly_prediction'][ticker] = np.array(predictions).reshape(14, 4)
-            st.session_state['biweekly_lower_ci'][ticker] = np.array(lower_ci).reshape(14)
-            st.session_state['biweekly_upper_ci'][ticker] = np.array(upper_ci).reshape(14)
+            st.session_state['biweekly_prediction'][ticker] = np.array(predictions[:14]).reshape(14, test_data.shape[1])
+            st.session_state['biweekly_lower_ci'][ticker] = np.array(lower_ci[:14])
+            st.session_state['biweekly_upper_ci'][ticker] = np.array(upper_ci[:14])
         elif i == 29:
-            st.session_state['monthly_prediction'][ticker] = np.array(predictions).reshape(30, 4)
-            st.session_state['monthly_lower_ci'][ticker] = np.array(lower_ci).reshape(30)
-            st.session_state['monthly_upper_ci'][ticker] = np.array(upper_ci).reshape(30)
+            st.session_state['monthly_prediction'][ticker] = np.array(predictions).reshape(30, test_data.shape[1])
+            st.session_state['monthly_lower_ci'][ticker] = np.array(lower_ci)
+            st.session_state['monthly_upper_ci'][ticker] = np.array(upper_ci)
+
+    return pred_dates, np.array(predictions), np.array(lower_ci), np.array(upper_ci)
+
 
 
 
@@ -506,15 +528,17 @@ def predict(ticker, data, last_update_time):
     training_data_len_tlkm = int(len(scaled_data) * 0.8)  
     train_data = scaled_data[:training_data_len_tlkm]
     test_data = scaled_data[training_data_len_tlkm:]
+    train_dates = data.index[:training_data_len_tlkm]
+    test_dates = data.index[training_data_len_tlkm:]
 
-    train_windowed_data_x,train_windowed_data_y = reshape_data(train_data,5)
-    test_windowed_data_x, test_windowed_data_y = reshape_data(test_data,5)
+    train_windowed_data_x,train_windowed_data_y, train_windowed_data_dates = reshape_data(train_data,train_dates,5)
+    test_windowed_data_x, test_windowed_data_y, test_windowed_data_date= reshape_data(test_data,test_dates,5)
     if is_over_one_month(datetime.now(), last_update_time) or last_update_time is None:
         update_model(train_windowed_data_x,train_windowed_data_y)
         model_lstm = load_model_lstm(ticker)
     else:
         model_lstm = load_model_lstm(ticker)
-    recursive_prediction(5,test_windowed_data_x, test_windowed_data_y, test_data,model_lstm,ticker,scaler)
+    recursive_prediction(5,test_windowed_data_x, test_windowed_data_y, test_data,test_windowed_data_date, model_lstm,ticker,scaler)
 
 
 def update_model(windowed_data_x,windowed_data_y):
@@ -555,6 +579,7 @@ def load_content():
             save_predictions()
         df_selected_data["Date"] = df_selected_data.index.strftime("%Y-%m-%d %H:%M:%S")
         all_data[ticker] = df_selected_data
+        load_predicted_line_json(ticker)
     save_cached_data(all_data)
 
 def load_content_from_cache(ticker):
@@ -566,12 +591,14 @@ def load_content_from_cache(ticker):
         with open(local_path_raw_data, "r") as f:
             raw_data = json.load(f)
             training_hist = load_training_history(ticker)
+            predictions_data_testing = load_predicted_line_json(ticker)
         
         df = pd.DataFrame(raw_data["cached_data"][ticker])
         df['Date'] = pd.to_datetime(df['Date'])
         df.set_index('Date', inplace=True)
         training_hist["date"] = datetime.strptime(training_hist["date"], "%Y-%m-%d %H:%M:%S")
         st.session_state['cached_data'][ticker] = df
+        st.session_state['predicted_data_testing'] = predictions_data_testing
         if ticker not in st.session_state['weekly_prediction'] or st.session_state['biweekly_prediction'] or st.session_state['monthly_prediction']:
             print("No prediction data found, generating new predictions.")
             load_predictions()
