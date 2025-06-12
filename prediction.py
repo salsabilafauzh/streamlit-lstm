@@ -16,6 +16,7 @@ import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 import time
 import base64
+from streamlit_echarts import st_echarts
 
 from pages.session_config.background_fetcher import fetch_all
 from pages.session_config.data_testing_prediction import load_predicted_line_json, save_predicted_line_json
@@ -113,111 +114,291 @@ CACHE_DATA_FILE = "cached_data.json"
 def handling_view():
     st.text(f"{get_translation(st.session_state['selected_language'], 'something_wrong')}")
     
+# def slider_y_axis(data, y_min, y_max):
+#     y_min= np.min(data)
+#     y_max= np.max(data)
+#     padding= (y_max- y_min) * 0.2
+    
+#     y_range = st.slider(
+#     "Y-axis (Harga Saham)",
+#     min_value=float(y_min - padding),
+#     max_value=float(y_max + padding),
+#     value=(float(y_min), float(y_max)),
+#     step=0.5,
+#     help="Atur batas bawah dan atas dari sumbu Y (harga saham)"
+#     )
+#     return y_range
+
+# def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upper_ci=None):
+#     st.subheader(f"{get_translation(st.session_state['selected_language'], 'title_prediction_result')}")
+
+#     if predicted_df.index is None or len(predicted_df.index) == 0:
+#         last_date = existing_data.index[-1]
+
+#         next_business_day = pd.bdate_range(start=last_date + pd.Timedelta(days=1), periods=1)[0]
+#         predicted_df.index = pd.bdate_range(start=next_business_day, periods=len(predicted_df))
+#         combined_xaxis = existing_data.index.append(predicted_df.index)
+#     if plot_type == 'candle':
+
+#         options = {
+#         "title": {"text": f"Candlestick Chart: {ticker}", "left": "center"},
+#         "tooltip": {"trigger": "axis"},
+#         "xAxis": {
+#             "type": "category",
+#             "data": combined_xaxis.index.strftime("%Y-%m-%d").tolist(),
+#             "scale": True,
+#             "boundaryGap": False,
+#             "axisLine": {"onZero": False}
+#         },
+#         "yAxis": {
+#             "scale": True,
+#             "splitArea": {"show": True}
+#         },
+#         "dataZoom": [
+#             {"type": "inside", "start": 60, "end": 100},
+#             {"show": True, "type": "slider", "top": "90%", "start": 60, "end": 100}
+#         ],
+#         "series": [{
+#             "name": "existing data",
+#             "type": "candlestick",
+#             "data": existing_data[["Open", "Close", "High", "Low"]].values.tolist(),
+#             "itemStyle": {
+#                 "color": "#00da3c",
+#                 "color0": "#ec0000",
+#                 "borderColor": "#008F28",
+#                 "borderColor0": "#8A0000"
+#             },
+#             },
+#             {
+#             "name": "Prediction",
+#             "type": "candlestick",
+#             "data":predicted_df[["Open", "Close", "High", "Low"]].values.tolist(),
+#             "itemStyle": {
+#                 "color": "#5B8FF9",
+#                 "color0": "#F4664A",
+#                 "borderColor": "#5B8FF9",
+#                 "borderColor0": "#F4664A"
+#             }
+#         }
+#             ]
+#         }
+
+#         st_echarts(options=options, height="500px")
+
+def safe_candlestick_row(row):
+    # Jika data valid, return row apa adanya
+    if row is None or any(v is None for v in row):
+        return [None, None, None, None]
+    return row
+
+
 def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upper_ci=None):
+  
     st.subheader(f"{get_translation(st.session_state['selected_language'], 'title_prediction_result')}")
 
     if predicted_df.index is None or len(predicted_df.index) == 0:
         last_date = existing_data.index[-1]
-
         next_business_day = pd.bdate_range(start=last_date + pd.Timedelta(days=1), periods=1)[0]
         predicted_df.index = pd.bdate_range(start=next_business_day, periods=len(predicted_df))
 
-    if plot_type == 'candle':
-        fig = go.Figure()
+    combined_xaxis = existing_data.index.append(predicted_df.index)
+    x_axis_data = combined_xaxis.strftime("%Y-%m-%d").tolist()
 
-        fig.add_trace(go.Candlestick(
-            x=existing_data.index, open=existing_data["Open"], high=existing_data["High"],
-            low=existing_data["Low"], close=existing_data["Close"],
-            name=f"{get_translation(st.session_state['selected_language'], 'existing_data')}"
-        ))
+    actual_data = existing_data[["Open", "Close", "Low", "High"]].values.tolist()
+    predicted_data = predicted_df[["Open", "Close", "Low", "High"]].values.tolist()
 
-        data_test_prediction = load_predicted_line_json(ticker)
-        prediction_ohlc_df = data_test_prediction['prediction'].apply(pd.Series)
-        if 'predicted_data_testing' not in st.session_state or st.session_state['predicted_data_testing'] is None:
-            st.session_state['predicted_data_testing']  = data_test_prediction
-        colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
-        for feature in ["Open", "High", "Low", "Close"]:
-            fig.add_trace(go.Scatter(
-                x=data_test_prediction["date"], y=prediction_ohlc_df[feature],
-                mode="lines", name=f"Predicted {feature} (data testing)",
-                line=dict(color=colors[feature])
-            ))
+    # padded_actual = actual_data + [None] * len(predicted_data)
+    # padded_predicted = [None] * len(actual_data) + predicted_data
 
-        fig.add_trace(go.Candlestick(
-            x=predicted_df.index, open=predicted_df["Open"], high=predicted_df["High"],
-            low=predicted_df["Low"], close=predicted_df["Close"],
-            name=f"{get_translation(st.session_state['selected_language'], 'data_prediction')}",
-            increasing_line_color='rgba(30, 144, 255, 0.5)',
-            decreasing_line_color='rgba(138, 43, 226, 0.5)'
-        ))
+    padded_actual = actual_data + [[None, None, None, None]] * len(predicted_data)
+    padded_actual = [safe_candlestick_row(r) for r in padded_actual]
 
-        if lower_ci is not None and upper_ci is not None:
-            lower_ci = np.array(lower_ci)
-            upper_ci = np.array(upper_ci)
-            index_vals = np.array(predicted_df.index.values)
+    padded_predicted = [[None, None, None, None]] * len(actual_data) + predicted_data
+    padded_predicted = [safe_candlestick_row(r) for r in padded_predicted]
+    mark_area = None
+    if lower_ci is not None and upper_ci is not None:
+        ci_start_idx = len(existing_data)  
+        ci_end_idx = ci_start_idx + len(predicted_df) - 1
 
-            fig.add_trace(go.Scatter(
-                x = np.concatenate((index_vals, index_vals[::-1])),
-                y = np.concatenate((lower_ci, upper_ci[::-1])),
-                fill='toself',
-                fillcolor='rgba(255, 0, 0, 0.2)',
-                line=dict(color='rgba(255,255,255,0)'),
-                hoverinfo="skip",
-                showlegend=True,
-                name='95% Confidence Interval'
-            ))
+        points = []
+        for i in range(len(predicted_df)):
+            points.append([
+                [ci_start_idx + i, lower_ci[i]],
+                [ci_start_idx + i, upper_ci[i]]
+            ])
 
-        fig.update_layout(
-            title=ticker,
-            xaxis_title="Date",
-            yaxis_title="Stock Price",
-            legend_title="Legend",
-            dragmode="pan"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        mark_area = {
+            "itemStyle": {
+                "color": "rgba(255, 0, 0, 0.2)"
+            },
+            "data": [
+                [
+                    {"xAxis": x_axis_data[ci_start_idx], "yAxis": float(lower_ci[0])},
+                    {"xAxis": x_axis_data[ci_end_idx], "yAxis": float(upper_ci[-1])}
+                ]
+            ]
+        }
 
-    else:
-        fig = go.Figure()
-        colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
+    options = {
+        "tooltip": {"trigger": "axis", "axisPointer": {"type": "cross"}},
+        "legend": {"data": ["Existing Data", "Prediction", "Confidence Interval"], "top": "top"},
+        "xAxis": {
+            "type": "category",
+            "data": x_axis_data,
+            "scale": True,
+            "boundaryGap": False,
+            "axisLine": {"onZero": False}
+        },
+        "yAxis": {
+            "scale": True,
+            "splitArea": {"show": True},
+            "min": "dataMin",
+            "max": "dataMax",
+            "name": "Price",
+            "nameLocation": "middle",
+            "nameGap": 50,
+            "axisLine": {"onZero": False},
+        },
+        "dataZoom": [
+            {"type": "inside", "start": 60, "end": 100},
+            {"show": True, "type": "slider", "top": "90%", "start": 60, "end": 100}
+        ],
+        "series": [
+            {
+                "name": "Existing Data",
+                "type": "candlestick",
+                "data": padded_actual,
+                "itemStyle": {
+                    "color": "#00da3c",
+                    "color0": "#ec0000",
+                    "borderColor": "#008F28",
+                    "borderColor0": "#8A0000"
+                }
+            },
+            {
+                "name": "Prediction",
+                "type": "candlestick",
+                "data": padded_predicted,
+                "itemStyle": {
+                    "color": "#5B8FF9",
+                    "color0": "#F4664A",
+                    "borderColor": "#5B8FF9",
+                    "borderColor0": "#F4664A"
+                }
+            },
+        ]
+    }
 
-        for feature in ["Close", "Open", "High", "Low"]:
-            fig.add_trace(go.Scatter(
-                x=existing_data.index, y=existing_data[feature],
-                mode="lines", name=f"Existing {feature}",
-                line=dict(color=colors[feature])
-            ))
-            fig.add_trace(go.Scatter(
-                x=predicted_df.index, y=predicted_df[feature],
-                mode="lines", name=f"Predicted {feature}",
-                line=dict(color=colors[feature], dash="dot")
-            ))
+    st_echarts(options=options, height="500px")
 
-        if lower_ci is not None and upper_ci is not None:
-            fig.add_trace(go.Scatter(
-                x=predicted_df.index.tolist() + predicted_df.index[::-1].tolist(),
-                y=list(lower_ci) + list(upper_ci[::-1]),
-                fill='toself',
-                fillcolor='rgba(30, 144, 255, 0.15)',
-                line=dict(color='rgba(255,255,255,0)'),
-                hoverinfo="skip",
-                showlegend=True,
-                name='95% Confidence Interval'
-            ))
 
-        fig.update_layout(
-            title=ticker,
-            xaxis_title="Date",
-            yaxis_title="Stock Price",
-            legend_title="Legend",
-            dragmode="pan"
-        )
 
-        if st.button("🔍 Fokus ke Prediksi + 1 Bulan Sebelumnya"):
-            start_focus = predicted_df.index[0] - pd.DateOffset(days=30)
-            end_focus = predicted_df.index[-1]
-            fig.update_xaxes(range=[start_focus, end_focus])
+        # fig = go.Figure()
 
-        st.plotly_chart(fig, use_container_width=True)
+        # fig.add_trace(go.Candlestick(
+        #     x=existing_data.index, open=existing_data["Open"], high=existing_data["High"],
+        #     low=existing_data["Low"], close=existing_data["Close"],
+        #     name=f"{get_translation(st.session_state['selected_language'], 'existing_data')}"
+        # ))
+
+        # data_test_prediction = load_predicted_line_json(ticker)
+        # prediction_ohlc_df = data_test_prediction['prediction'].apply(pd.Series)
+        # if 'predicted_data_testing' not in st.session_state or st.session_state['predicted_data_testing'] is None:
+        #     st.session_state['predicted_data_testing']  = data_test_prediction
+        # colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
+        # for feature in ["Open", "High", "Low", "Close"]:
+        #     fig.add_trace(go.Scatter(
+        #         x=data_test_prediction["date"], y=prediction_ohlc_df[feature],
+        #         mode="lines", name=f"Predicted {feature} (data testing)",
+        #         line=dict(color=colors[feature])
+        #     ))
+
+        # fig.add_trace(go.Candlestick(
+        #     x=predicted_df.index, open=predicted_df["Open"], high=predicted_df["High"],
+        #     low=predicted_df["Low"], close=predicted_df["Close"],
+        #     name=f"{get_translation(st.session_state['selected_language'], 'data_prediction')}",
+        #     increasing_line_color='rgba(30, 144, 255, 0.5)',
+        #     decreasing_line_color='rgba(138, 43, 226, 0.5)'
+        # ))
+
+        # if lower_ci is not None and upper_ci is not None:
+        #     lower_ci = np.array(lower_ci)
+        #     upper_ci = np.array(upper_ci)
+        #     index_vals = np.array(predicted_df.index.values)
+
+        #     fig.add_trace(go.Scatter(
+        #         x = np.concatenate((index_vals, index_vals[::-1])),
+        #         y = np.concatenate((lower_ci, upper_ci[::-1])),
+        #         fill='toself',
+        #         fillcolor='rgba(255, 0, 0, 0.2)',
+        #         line=dict(color='rgba(255,255,255,0)'),
+        #         hoverinfo="skip",
+        #         showlegend=True,
+        #         name='95% Confidence Interval'
+        #     ))
+        # y_range = slider_y_axis(existing_data, existing_data.min(), existing_data.max())
+    #     fig.update_layout(
+    #         title=ticker,
+    #         xaxis_title="Date",
+    #         yaxis_title="Stock Price",
+    #         legend_title="Legend",
+    #         dragmode="pan",
+    #          yaxis=dict(
+    #     fixedrange=False  
+    # )
+    #     )
+
+        # if st.button("🔍 Fokus ke Prediksi + 1 Bulan Sebelumnya"):
+        #     start_focus = predicted_df.index[0] - pd.DateOffset(days=30)
+        #     end_focus = predicted_df.index[-1]
+        #     fig.update_xaxes(range=[start_focus, end_focus])
+        # st.plotly_chart(fig, use_container_width=True)
+    
+    # else:
+    #     fig = go.Figure()
+    #     colors = {"Close": "blue", "Open": "green", "High": "orange", "Low": "purple"}
+
+    #     for feature in ["Close", "Open", "High", "Low"]:
+    #         fig.add_trace(go.Scatter(
+    #             x=existing_data.index, y=existing_data[feature],
+    #             mode="lines", name=f"Existing {feature}",
+    #             line=dict(color=colors[feature])
+    #         ))
+    #         fig.add_trace(go.Scatter(
+    #             x=predicted_df.index, y=predicted_df[feature],
+    #             mode="lines", name=f"Predicted {feature}",
+    #             line=dict(color=colors[feature], dash="dot")
+    #         ))
+
+    #     if lower_ci is not None and upper_ci is not None:
+    #         fig.add_trace(go.Scatter(
+    #             x=predicted_df.index.tolist() + predicted_df.index[::-1].tolist(),
+    #             y=list(lower_ci) + list(upper_ci[::-1]),
+    #             fill='toself',
+    #             fillcolor='rgba(30, 144, 255, 0.15)',
+    #             line=dict(color='rgba(255,255,255,0)'),
+    #             hoverinfo="skip",
+    #             showlegend=True,
+    #             name='95% Confidence Interval'
+    #         ))
+
+    #     fig.update_layout(
+    #         title=ticker,
+    #         xaxis_title="Date",
+    #         yaxis_title="Stock Price",
+    #         legend_title="Legend",
+    #         dragmode="pan",
+    #         yaxis=dict(
+    #     fixedrange=False  # Ini yang bikin sumbu-Y bisa dipan
+    # )
+    #     )
+
+    #     # if st.button("🔍 Fokus ke Prediksi + 1 Bulan Sebelumnya"):
+    #     #     start_focus = predicted_df.index[0] - pd.DateOffset(days=30)
+    #     #     end_focus = predicted_df.index[-1]
+    #     #     fig.update_xaxes(range=[start_focus, end_focus])
+
+    #     st.plotly_chart(fig, use_container_width=True)
 
 
 def plot_history_training(history):
@@ -449,11 +630,6 @@ def retraining_model(X_train, y_train,ticker):
     return model
 
 
-import numpy as np
-import pandas as pd
-from scipy import stats
-import streamlit as st
-
 def recursive_prediction(steps, test_windowed_x, test_windowed_y, test_data, test_dates,model, ticker, scaler):
     predictions = []
     lower_ci = []
@@ -506,8 +682,6 @@ def recursive_prediction(steps, test_windowed_x, test_windowed_y, test_data, tes
     return pred_dates, np.array(predictions), np.array(lower_ci), np.array(upper_ci)
 
 
-
-
 @st.cache_resource  
 def load_model_lstm(ticker):
     file_name = companies[ticker]
@@ -539,7 +713,6 @@ def predict(ticker, data, last_update_time):
     else:
         model_lstm = load_model_lstm(ticker)
     recursive_prediction(5,test_windowed_data_x, test_windowed_data_y, test_data,test_windowed_data_date, model_lstm,ticker,scaler)
-
 
 def update_model(windowed_data_x,windowed_data_y):
 
