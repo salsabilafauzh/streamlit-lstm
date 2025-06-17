@@ -164,9 +164,9 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
                 "data": padded_predicted,
                 "itemStyle": {
                     "color": "#5B8FF9",
-                    "color0": "#F4664A",
+                    "color0": "#4AB9F4",
                     "borderColor": "#5B8FF9",
-                    "borderColor0": "#F4664A"
+                    "borderColor0": "#4AC1F4"
                 },
             }
         ]
@@ -176,8 +176,12 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
         prediction_ohlc_df = data_test_prediction['prediction'].apply(pd.Series)
         if 'predicted_data_testing' not in st.session_state or st.session_state['predicted_data_testing'] is None:
             st.session_state['predicted_data_testing'] = data_test_prediction
-
-        colors = {"Close": "purple", "Open": "blue", "High": "orange", "Low": "green"}
+        colors = {
+            "Open": "#0000FF",   
+            "High": "#FFA500",   
+            "Low": "#008000",     
+            "Close": "#800080"    
+        }
 
         pad_len = len(existing_data) - len(data_test_prediction['date'])
         pad_len = max(0, pad_len)  
@@ -190,6 +194,7 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
                 "name": f"Predicted {feature} (data testing)",
                 "type": "line",
                 "data": padded_feature_values,
+                "itemStyle": {"color": colors[feature]},
                 "lineStyle": {"color": colors[feature], 
                 "width": 1, 
                 "type": "dashed"
@@ -249,15 +254,51 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
             series.append(ci_lower)
             series.append(ci_band)
             series.append(ci_upper)
-    
 
             options = {
-            "tooltip": {"trigger": "axis", "axisPointer": {"type": "cross"}},
+            "tooltip": {
+                "trigger": "axis",
+                "axisPointer": {
+                    "type": "cross",
+                    "crossStyle": {
+                        "color": "#FFA500"  
+                    }
+                }
+            },
             "legend": {
                 "data": [
-                    get_translation(st.session_state['selected_language'], 'existing_data'),
-                    get_translation(st.session_state['selected_language'], 'data_prediction'),
-                    "95% Confidence Interval",
+                    {
+                        "name": get_translation(st.session_state['selected_language'], 'existing_data'),
+                        "icon": "roundRect",
+                    },
+                    {
+                        "name": get_translation(st.session_state['selected_language'], 'data_prediction'),
+                        "icon": "rect",
+                    },
+                    {
+                        "name": "Predicted Open (data testing)",
+                        "icon": "line",
+                        "lineStyle": {"color": colors["Open"], "width": 1, "type": "dashed"},
+                        "itemStyle": {"color": colors["Open"]},
+                    },
+                    {
+                        "name": "Predicted High (data testing)",
+                        "icon": "line",
+                        "lineStyle": {"color": colors["High"], "width": 1, "type": "dashed"},
+                        "itemStyle": {"color": colors["High"]}
+                    },
+                    {
+                        "name": "Predicted Low (data testing)",
+                        "icon": "line",
+                        "lineStyle": {"color": colors["Low"], "width": 1, "type": "dashed"},
+                        "itemStyle": {"color": colors["Low"]}
+                    },
+                    {
+                        "name": "Predicted Close (data testing)",
+                        "icon": "line",
+                        "lineStyle": {"color": colors["Close"], "width": 1, "type": "dashed"},
+                        "itemStyle": {"color": colors["Close"]}
+                    },
                 ],
                 "top": "top",
                 "selectedMode": "multiple",
@@ -286,6 +327,7 @@ def plot_data(existing_data, predicted_df, ticker, plot_type, lower_ci=None, upp
             ],
             "series": series,
         }
+
 
         st_echarts(options=options, height="650px")
 

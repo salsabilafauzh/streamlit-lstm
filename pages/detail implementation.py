@@ -3,7 +3,7 @@ from pages.session_config.lang_detail import get_translation
 import base64
 
 st.set_page_config(
-    page_title="Detail Impelemntasi",
+    page_title="Detail Implementasi",
     page_icon=":bulb:",
     layout="wide"
 )
